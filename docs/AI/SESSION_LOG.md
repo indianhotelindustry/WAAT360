@@ -4,7 +4,32 @@ This document tracks all significant development and engineering sessions.
 
 ---
 
+## Session 6: Phase 3 — WAAST360 Lite Golden Path Implementation & Certification
+- **Date**: 2026-09-22
+- **Agent**: Antigravity / Gemini 3.8
+- **Objective**: Execute the complete, verified WAAST360 Lite Golden Path vertical slice under the 10 core architectural controls (Phases 3A through 3L).
+- **Work Completed**:
+  - **Phase 3A (`TallySimulatedAdapter`)**: Implemented high-fidelity simulation adapter with realistic Indian GST accounting state, sequential numbering (`PUR/2026/0001`), and idempotency deduplication. Added `--simulated` CLI flag.
+  - **Phase 3B (`Document Ingestion`)**: Implemented `POST /api/v1/documents/upload` with SHA256 checksums, duplicate detection, and `Document`/`DocumentVersion` persistence.
+  - **Phase 3C (`Gemini AI Extraction`)**: Built `AIProvider` abstraction, `GeminiProvider` with deterministic fallback, and `POST /api/v1/documents/{id}/extract` saving `DocumentExtraction` & `ExtractionField` records.
+  - **Phase 3D, 3E, 3F (`Proposal & Validation Engine`)**: Built `ProposalEngine` for double-entry voucher generation (Purchase Dr, Input CGST/SGST/IGST Dr, Supplier Cr) and `ValidationEngine` for `VAL-RULE-001` (balance), `VAL-RULE-002` (GST math), and `VAL-RULE-003` (duplicate detection).
+  - **Phase 3G, 3H (`Human Approval & Posting Job`)**: Built `POST /api/v1/proposals/{id}/approve` enforcing human authority before financial writes. Materialized authoritative immutable `Transaction`, `TransactionLine`s, `PostingJob`, and queued job for Bridge pickup.
+  - **Phase 3I, 3J, 3K (`Bridge Execution, Read-Back & Audit`)**: Bridge polls pending jobs outbound, posts voucher, executes immediate read-back query via `verify_transaction()`, reports evidence to Cloud API (`VerificationResult`), and appends immutable `AuditEvent`.
+  - **Phase 3L (`End-to-End Certification`)**: Created automated end-to-end certification test `tests/test_golden_path_e2e.py` covering all 10 stages.
+  - **Frontend Console (`web/src/app/page.tsx`)**: Upgraded Next.js 16 dashboard with 10-stage pipeline visualizer, sample invoice ingestion, Gemini extraction review, proposal & validation display, approval console, simulated bridge execution trigger, and forensic audit timeline.
+- **Tests**:
+  - Cloud API: 13/13 passing (`pytest tests/`).
+  - Bridge: 20/20 passing (`pytest tests/`).
+  - Next.js Web: Production build successful (Turbopack, 0 TypeScript errors).
+  - Python Ruff: 0 lint errors, 100% formatted across both Python packages.
+- **Decisions**: DEC-019 (Simulator contract fidelity), DEC-020 (Deterministic rules preceding approval), DEC-021 (AIProvider abstraction), DEC-022 (Explicit 10-stage state machine).
+- **Blockers**: None. `LIVE-TALLY-CERT-001` preserved as deployment certification gate for client machine.
+- **Next Action**: Prepare Windows client deployment package (`TASK-DEP-01`) for eventual `LIVE-TALLY-CERT-001` certification on client office machine.
+
+---
+
 ## Session 5: AI Continuity, Handoff & Repository Knowledge Base Baseline
+
 - **Date**: 2026-09-22
 - **Agent**: Antigravity / Gemini 3.8
 - **Objective**: Establish complete repository-grounded AI continuity and handoff layer so another AI agent (especially Claude Code) can take over immediately with zero conversational context.

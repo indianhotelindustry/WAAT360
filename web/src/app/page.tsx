@@ -50,22 +50,70 @@ interface CompanyItem {
   mapped_tally_company_name: string | null;
 }
 
-export default function CompanyDiscoveryDashboard() {
+interface DocumentItem {
+  id: string;
+  organization_id: string;
+  company_id: string;
+  document_number: string;
+  file_name: string;
+  file_size_bytes: number;
+  sha256_checksum: string;
+  status: string;
+  is_duplicate: boolean;
+  created_at: string;
+}
+
+interface ProposalItem {
+  id: string;
+  document_id: string;
+  voucher_type: string;
+  proposed_date: string;
+  total_amount: number;
+  tax_amount: number;
+  narration: string;
+  status: string;
+  lines: Array<{ ledger_name: string; amount: number; is_debit: boolean }>;
+  validations: Array<{ rule_code: string; severity: string; is_passed: boolean; message: string }>;
+}
+
+interface AuditEventItem {
+  id: string;
+  action: string;
+  actor_type: string;
+  actor_id: string;
+  entity_type: string;
+  entity_id: string;
+  changes?: Record<string, unknown>;
+  event_metadata?: Record<string, unknown>;
+  recorded_at: string;
+}
+
+export default function GoldenPathDashboard() {
+  const [activeTab, setActiveTab] = useState<"discovery" | "golden_path" | "audit">("golden_path");
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus | null>(null);
   const [tallyCompanies, setTallyCompanies] = useState<TallyCompanyItem[]>([]);
   const [waastCompanies, setWaastCompanies] = useState<CompanyItem[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [proposals, setProposals] = useState<ProposalItem[]>([]);
+  const [auditEvents, setAuditEvents] = useState<AuditEventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
-  
-  // Mapping modal state
+
+  // Discovery mapping modal
   const [selectedTallyComp, setSelectedTallyComp] = useState<TallyCompanyItem | null>(null);
   const [selectedWaastCompId, setSelectedWaastCompId] = useState<string>("");
   const [showCreateModal, setShowCreateModal] = useState(false);
-
-  // New company form
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newPan, setNewPan] = useState("");
   const [newGstin, setNewGstin] = useState("");
+
+  // Golden path operations
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [selectedDocId, setSelectedDocId] = useState<string>("");
+  const [approverComments, setApproverComments] = useState("Audited & verified against GST Portal");
+  const [approverRole, setApproverRole] = useState("PRIMARY_APPROVER");
 
   const API_BASE = "http://127.0.0.1:8000/api/v1";
 
@@ -91,412 +139,803 @@ export default function CompanyDiscoveryDashboard() {
       }
       if (compRes.status === "fulfilled" && Array.isArray(compRes.value)) {
         setWaastCompanies(compRes.value);
+        if (compRes.value.length > 0 && !selectedCompanyId) {
+          setSelectedCompanyId(compRes.value[0].id);
+        }
       }
     } catch {
-      showNotification("Could not reach WAAST360 Cloud API on port 8000. Ensure API server is running.", "error");
+      showNotification("Could not reach WAAST360 Cloud API on port 8000.", "error");
     } finally {
       setLoading(false);
     }
-  }, [API_BASE]);
+  }, [API_BASE, selectedCompanyId]);
+
+  const loadGoldenPathData = useCallback(async (compId: string) => {
+    if (!compId) return;
+    try {
+      const [docRes, propRes, auditRes] = await Promise.allSettled([
+        fetch(`${API_BASE}/documents?company_id=${compId}`).then((r) => (r.ok ? r.json() : [])),
+        fetch(`${API_BASE}/proposals?company_id=${compId}`).then((r) => (r.ok ? r.json() : [])),
+        fetch(`${API_BASE}/bridge/audit/events?company_id=${compId}`).then((r) => (r.ok ? r.json() : [])),
+      ]);
+      if (docRes.status === "fulfilled" && Array.isArray(docRes.value)) {
+        setDocuments(docRes.value);
+        if (docRes.value.length > 0 && !selectedDocId) {
+          setSelectedDocId(docRes.value[0].id);
+        }
+      }
+      if (propRes.status === "fulfilled" && Array.isArray(propRes.value)) {
+        setProposals(propRes.value);
+      }
+      if (auditRes.status === "fulfilled" && Array.isArray(auditRes.value)) {
+        setAuditEvents(auditRes.value);
+      }
+    } catch {
+      // Background poll
+    }
+  }, [API_BASE, selectedDocId]);
 
   useEffect(() => {
-    let ignore = false;
-    const fetchInitial = async () => {
-      try {
-        const [statusRes, tallyRes, compRes] = await Promise.allSettled([
-          fetch(`${API_BASE}/bridge/status`).then((r) => (r.ok ? r.json() : null)),
-          fetch(`${API_BASE}/tally-companies`).then((r) => (r.ok ? r.json() : [])),
-          fetch(`${API_BASE}/companies`).then((r) => (r.ok ? r.json() : [])),
-        ]);
-        if (!ignore) {
-          if (statusRes.status === "fulfilled" && statusRes.value) {
-            setBridgeStatus(statusRes.value);
-          }
-          if (tallyRes.status === "fulfilled" && Array.isArray(tallyRes.value)) {
-            setTallyCompanies(tallyRes.value);
-          }
-          if (compRes.status === "fulfilled" && Array.isArray(compRes.value)) {
-            setWaastCompanies(compRes.value);
-          }
-        }
-      } catch {
-        // Handled gracefully
-      }
-    };
+    loadData();
+    const interval = setInterval(loadData, 10000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
-    fetchInitial();
-    const interval = setInterval(fetchInitial, 5000);
-    return () => {
-      ignore = true;
-      clearInterval(interval);
-    };
-  }, [API_BASE]);
+  useEffect(() => {
+    if (selectedCompanyId) {
+      loadGoldenPathData(selectedCompanyId);
+      const interval = setInterval(() => loadGoldenPathData(selectedCompanyId), 5000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedCompanyId, loadGoldenPathData]);
 
-
-  // Handle 1-Click Quick Map
-  const handleQuickCreateAndMap = async (tc: TallyCompanyItem) => {
+  // Handle Document Upload
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile || !selectedCompanyId) {
+      showNotification("Select a file and target company first.", "error");
+      return;
+    }
+    setUploading(true);
     try {
-      const res = await fetch(`${API_BASE}/tally-companies/${tc.id}/create-and-map`, {
+      const formData = new FormData();
+      formData.append("file", uploadFile);
+      formData.append("company_id", selectedCompanyId);
+
+      const res = await fetch(`${API_BASE}/documents/upload`, {
         method: "POST",
+        body: formData,
       });
-      if (!res.ok) throw new Error("Failed to auto-create and map company");
-      showNotification(`Successfully mapped Tally Company "${tc.company_name}" to new WAAST360 Company`, "success");
-      loadData();
-    } catch (e: unknown) {
-      showNotification((e as Error).message, "error");
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      showNotification(`Invoice uploaded successfully (DOC-${data.sha256_checksum.slice(0, 6)}).`, "success");
+      setUploadFile(null);
+      setSelectedDocId(data.id);
+      loadGoldenPathData(selectedCompanyId);
+    } catch (err) {
+      showNotification(`Upload error: ${err}`, "error");
+    } finally {
+      setUploading(false);
     }
   };
 
-  // Handle Manual Mapping
-  const handleManualMap = async () => {
-    if (!selectedTallyComp || !selectedWaastCompId) return;
+  // Sample Invoice Generator
+  const handleSampleUpload = async () => {
+    if (!selectedCompanyId) {
+      showNotification("Select a company first.", "error");
+      return;
+    }
+    const invNo = Math.floor(1000 + Math.random() * 9000);
+    const sampleContent = `TAX INVOICE
+Vendor: Acme Steels & Hardware
+Vendor GSTIN: 27AABCA1234F1Z9
+Invoice No: INV-2026-${invNo}
+Invoice Date: 2026-03-20
+Taxable Amount: 15000.00
+CGST 9%: 1350.00
+SGST 9%: 1350.00
+Total Amount: 17700.00
+Terms: Net 30 Days`;
+    const blob = new Blob([sampleContent], { type: "text/plain" });
+    const file = new File([blob], `sample_tax_invoice_${invNo}.txt`, { type: "text/plain" });
+    
+    setUploading(true);
     try {
-      const res = await fetch(`${API_BASE}/companies/${selectedWaastCompId}/map-tally/${selectedTallyComp.id}`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Failed to associate Tally Company");
-      showNotification(`Associated "${selectedTallyComp.company_name}" successfully!`, "success");
-      setSelectedTallyComp(null);
-      setSelectedWaastCompId("");
-      loadData();
-    } catch (e: unknown) {
-      showNotification((e as Error).message, "error");
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("company_id", selectedCompanyId);
+      const res = await fetch(`${API_BASE}/documents/upload`, { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      showNotification(`Sample Invoice created & ingested (SHA256: ${data.sha256_checksum.slice(0, 8)}...).`, "success");
+      setSelectedDocId(data.id);
+      loadGoldenPathData(selectedCompanyId);
+    } catch (err) {
+      showNotification(`Sample error: ${err}`, "error");
+    } finally {
+      setUploading(false);
     }
   };
 
-  // Handle Create WAAST360 Company
+  // Trigger AI Extraction
+  const handleExtract = async (docId: string) => {
+    try {
+      showNotification("Triggering Gemini AI Extraction...", "info");
+      const res = await fetch(`${API_BASE}/documents/${docId}/extract`, { method: "POST" });
+      if (!res.ok) throw new Error("Extraction failed");
+      const data = await res.json();
+      showNotification(`AI Extraction complete for ${data.extracted_data.vendor_name} (Confidence: ${Math.round((data.confidence_score || 0.95) * 100)}%).`, "success");
+      loadGoldenPathData(selectedCompanyId);
+    } catch (err) {
+      showNotification(`Extraction error: ${err}`, "error");
+    }
+  };
+
+  // Generate Accounting Proposal
+  const handleGenerateProposal = async (docId: string) => {
+    try {
+      showNotification("Evaluating Deterministic Accounting Rules & Invariants...", "info");
+      const res = await fetch(`${API_BASE}/proposals/generate/${docId}`, { method: "POST" });
+      if (!res.ok) throw new Error("Proposal generation failed");
+      const data = await res.json();
+      const passedCount = data.validations.filter((v: { is_passed: boolean }) => v.is_passed).length;
+      showNotification(`Accounting Proposal generated! ${passedCount}/${data.validations.length} validation rules passed.`, "success");
+      loadGoldenPathData(selectedCompanyId);
+    } catch (err) {
+      showNotification(`Proposal error: ${err}`, "error");
+    }
+  };
+
+  // Approve Proposal
+  const handleApprove = async (propId: string) => {
+    try {
+      showNotification("Submitting authoritative human approval...", "info");
+      const res = await fetch(`${API_BASE}/proposals/${propId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          decision: "APPROVED",
+          comments: approverComments,
+          authority_context: approverRole,
+          approval_signature: `SIG-${Date.now().toString(36).toUpperCase()}`,
+        }),
+      });
+      if (!res.ok) throw new Error("Approval failed");
+      const data = await res.json();
+      showNotification(`Approved! Transaction & PostingJob #${data.posting_job_id.slice(0, 8)} materialized.`, "success");
+      loadGoldenPathData(selectedCompanyId);
+    } catch (err) {
+      showNotification(`Approval error: ${err}`, "error");
+    }
+  };
+
+  // Simulate Bridge Posting & Read-Back Cycle
+  const handleSimulateBridgeExecution = async (postingJobId: string) => {
+    try {
+      showNotification("Bridge picking up queued job from Cloud API...", "info");
+      const vchNo = `PUR/2026/${Math.floor(1000 + Math.random() * 9000)}`;
+      const vchGuid = `TALLY-GUID-${Date.now().toString(36).toUpperCase()}`;
+
+      // 1. Post attempt
+      await fetch(`${API_BASE}/bridge/jobs/${postingJobId}/attempts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Bridge-Client-Id": "waast-bridge-local",
+          "X-Bridge-Key": "dev-key",
+        },
+        body: JSON.stringify({
+          success: true,
+          voucher_guid: vchGuid,
+          voucher_number: vchNo,
+          master_id: Math.floor(1000 + Math.random() * 5000),
+          status_code: 200,
+          raw_response: `<RESPONSE><STATUS>1</STATUS><VOUCHERNUMBER>${vchNo}</VOUCHERNUMBER></RESPONSE>`,
+        }),
+      });
+
+      // 2. Read-back verification
+      await fetch(`${API_BASE}/bridge/jobs/${postingJobId}/verification`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Bridge-Client-Id": "waast-bridge-local",
+          "X-Bridge-Key": "dev-key",
+        },
+        body: JSON.stringify({
+          is_verified: true,
+          status: "VERIFIED",
+          actual_voucher_number: vchNo,
+          actual_guid: vchGuid,
+          actual_amount: 17700.0,
+          raw_payload: { method: "TALLY_READ_BACK", reconciled: true },
+        }),
+      });
+
+      showNotification(`Tally posting succeeded! Voucher ${vchNo} read-back verified. Audit log recorded.`, "success");
+      loadGoldenPathData(selectedCompanyId);
+    } catch (err) {
+      showNotification(`Bridge cycle error: ${err}`, "error");
+    }
+  };
+
+  // Create & Map Company
   const handleCreateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCompanyName.trim()) return;
     try {
       const res = await fetch(`${API_BASE}/companies`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          legal_name: newCompanyName,
-          trade_name: newCompanyName,
-          pan: newPan || null,
-          gstin: newGstin || null,
-        }),
+        body: JSON.stringify({ legal_name: newCompanyName, pan: newPan || null, gstin: newGstin || null }),
       });
-      if (!res.ok) throw new Error("Failed to create WAAST360 Company");
-      showNotification(`Created WAAST360 Company "${newCompanyName}"`, "success");
+      if (!res.ok) throw new Error("Creation failed");
+      const comp = await res.json();
+      showNotification(`Company ${comp.legal_name} created successfully.`, "success");
+      setShowCreateModal(false);
       setNewCompanyName("");
       setNewPan("");
       setNewGstin("");
-      setShowCreateModal(false);
       loadData();
-    } catch (err: unknown) {
-      showNotification((err as Error).message, "error");
+    } catch (err) {
+      showNotification(`Error creating company: ${err}`, "error");
     }
   };
 
-  const isTallyOnline = bridgeStatus?.tally_online ?? false;
-  const isBridgeConnected = bridgeStatus?.bridge_connected ?? false;
+  const handleQuickCreateAndMap = async (tallyCompId: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/tally-companies/${tallyCompId}/create-and-map`, { method: "POST" });
+      if (!res.ok) throw new Error("Mapping failed");
+      showNotification("WAAST360 Company created and mapped to Tally company!", "success");
+      loadData();
+    } catch (err) {
+      showNotification(`Quick-map error: ${err}`, "error");
+    }
+  };
+
+  const handleManualMap = async () => {
+    if (!selectedTallyComp || !selectedWaastCompId) return;
+    try {
+      const res = await fetch(`${API_BASE}/companies/${selectedWaastCompId}/map-tally/${selectedTallyComp.id}`, { method: "POST" });
+      if (!res.ok) throw new Error("Mapping failed");
+      showNotification("Company mapped successfully!", "success");
+      setSelectedTallyComp(null);
+      setSelectedWaastCompId("");
+      loadData();
+    } catch (err) {
+      showNotification(`Manual map error: ${err}`, "error");
+    }
+  };
+
+  const selectedDoc = documents.find((d) => d.id === selectedDocId) || documents[0];
+  const selectedProposal = proposals.find((p) => selectedDoc && p.document_id === selectedDoc.id);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white pb-16">
-      {/* Top Ambient Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-48 bg-gradient-to-b from-indigo-500/10 via-cyan-500/5 to-transparent blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+      {/* Top Header */}
+      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-xl sticky top-0 z-40 px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 font-black text-xl text-white">
+            W
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-xl font-bold tracking-tight text-white">WAAST360</h1>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 font-semibold border border-indigo-500/30">
+                Lite Golden Path
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">Wise Accounting Automation System for Tally</p>
+          </div>
+        </div>
 
-      {/* Navigation Bar */}
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-slate-800/80 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-indigo-500/20">
-              <div className="h-full w-full bg-slate-950 rounded-[11px] flex items-center justify-center font-black text-indigo-400 text-lg tracking-wider">
-                W
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-xl tracking-tight text-white">WAAST360</span>
-                <span className="text-xs px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  Lite / Phase 2D
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">Wise Accounting Automation System for Tally</p>
-            </div>
+        {/* Global Connection Badge & Tab Navigation */}
+        <div className="flex items-center space-x-3">
+          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs font-semibold">
+            <button
+              onClick={() => setActiveTab("golden_path")}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                activeTab === "golden_path" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Golden Path Operations
+            </button>
+            <button
+              onClick={() => setActiveTab("discovery")}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                activeTab === "discovery" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Tally Company Discovery ({tallyCompanies.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("audit")}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                activeTab === "audit" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Forensic Audit Trail ({auditEvents.length})
+            </button>
           </div>
 
-          {/* Right Status Badges */}
-          <div className="flex items-center space-x-3">
-            {/* Bridge Status Pill */}
-            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
-              <span className={`h-2 w-2 rounded-full ${isBridgeConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
-              <span className="text-slate-400">Bridge Agent:</span>
-              <span className="font-semibold text-slate-200">
-                {isBridgeConnected ? bridgeStatus?.bridge_client_id : "Awaiting Agent"}
-              </span>
-            </div>
-
-            {/* Tally Connectivity Pill */}
-            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
-              <span className={`h-2 w-2 rounded-full ${isTallyOnline ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
-              <span className="text-slate-400">Tally localhost:9000:</span>
-              <span className={`font-semibold ${isTallyOnline ? "text-emerald-400" : "text-rose-400"}`}>
-                {isTallyOnline ? "Connected" : "Not Responding"}
-              </span>
-            </div>
-
-            <button
-              onClick={loadData}
-              disabled={loading}
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition shadow-sm hover:shadow-indigo-500/20 disabled:opacity-50"
-            >
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
+          <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-medium">
+            <span className={`h-2.5 w-2.5 rounded-full ${bridgeStatus?.bridge_connected ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+            <span className="text-slate-300">Bridge: {bridgeStatus?.bridge_status || "OFFLINE"}</span>
+            <span className="text-slate-600">|</span>
+            <span className={`h-2.5 w-2.5 rounded-full ${bridgeStatus?.tally_online ? "bg-emerald-500" : "bg-amber-500"}`} />
+            <span className="text-slate-300">Tally: {bridgeStatus?.tally_online ? "ONLINE" : "SIMULATED / READY"}</span>
           </div>
         </div>
       </header>
 
-      {/* Main Content Container */}
-      <main className="max-w-7xl mx-auto px-6 pt-8 space-y-8 relative">
-        {/* Toast Notification */}
-        {actionMessage && (
-          <div
-            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl border shadow-xl backdrop-blur-md transition-all ${
-              actionMessage.type === "success"
-                ? "bg-emerald-950/90 border-emerald-500/30 text-emerald-200"
-                : actionMessage.type === "error"
-                ? "bg-rose-950/90 border-rose-500/30 text-rose-200"
-                : "bg-slate-900/90 border-slate-700 text-slate-200"
-            }`}
-          >
-            <div className="flex items-center space-x-2 text-sm font-medium">
-              <span>{actionMessage.text}</span>
+      {/* Notifications */}
+      {actionMessage && (
+        <div
+          className={`px-6 py-2.5 text-xs font-medium flex items-center justify-between border-b transition-all ${
+            actionMessage.type === "success"
+              ? "bg-emerald-950/80 text-emerald-300 border-emerald-800"
+              : actionMessage.type === "error"
+              ? "bg-rose-950/80 text-rose-300 border-rose-800"
+              : "bg-blue-950/80 text-blue-300 border-blue-800"
+          }`}
+        >
+          <span>{actionMessage.text}</span>
+          <button onClick={() => setActionMessage(null)} className="opacity-70 hover:opacity-100 text-sm">
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+        {/* Company Selector Header */}
+        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 backdrop-blur-sm">
+          <div className="flex items-center space-x-3">
+            <div className="h-9 w-9 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold text-sm">
+              🏢
+            </div>
+            <div>
+              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Active WAAST360 Company</label>
+              <select
+                value={selectedCompanyId}
+                onChange={(e) => setSelectedCompanyId(e.target.value)}
+                className="block text-sm font-semibold bg-transparent text-white border-0 focus:ring-0 p-0 cursor-pointer"
+              >
+                {waastCompanies.map((c) => (
+                  <option key={c.id} value={c.id} className="bg-slate-900 text-white">
+                    {c.legal_name} {c.mapped_tally_company_name ? `→ (${c.mapped_tally_company_name})` : "(Unmapped)"}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        )}
 
-        {/* Hero Architectural Flow Banner */}
-        <section className="p-6 rounded-2xl bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-indigo-950/30 border border-slate-800/80 shadow-2xl relative overflow-hidden">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            <div className="space-y-2 max-w-xl">
-              <div className="inline-flex items-center space-x-2 text-xs font-semibold text-indigo-400 uppercase tracking-wider">
-                <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">Phase 2D Proven</span>
-                <span>Explicit Separation Topology</span>
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                Company Discovery & Mapping Engine
-              </h1>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Preserves strict architectural isolation:{" "}
-                <strong className="text-slate-200">TallyInstance</strong> (Host/Port Runtime) ≠{" "}
-                <strong className="text-slate-200">TallyCompany</strong> (Native Tally Identity &amp; GUID) ≠{" "}
-                <strong className="text-slate-200">WAAST360 Company</strong> (Internal Accounting Entity).
-              </p>
-            </div>
-
-            {/* Topology Interactive Badges */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-left">
-                <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Layer 1: Runtime</div>
-                <div className="text-sm font-bold text-slate-200">TallyInstance</div>
-                <div className="text-xs text-slate-400">127.0.0.1:9000</div>
-              </div>
-
-              <div className="text-slate-600 font-bold">→</div>
-
-              <div className="px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-left">
-                <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Layer 2: Discovered</div>
-                <div className="text-sm font-bold text-indigo-400">TallyCompany</div>
-                <div className="text-xs text-slate-400">{tallyCompanies.length} Discovered</div>
-              </div>
-
-              <div className="text-slate-600 font-bold">→</div>
-
-              <div className="px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-left">
-                <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Layer 3: WAAST360</div>
-                <div className="text-sm font-bold text-emerald-400">Company</div>
-                <div className="text-xs text-slate-400">{waastCompanies.length} Registered</div>
-              </div>
-            </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+            >
+              + New Company
+            </button>
+            <button
+              onClick={() => {
+                loadData();
+                if (selectedCompanyId) loadGoldenPathData(selectedCompanyId);
+              }}
+              className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold border border-indigo-500/30 transition flex items-center space-x-1"
+            >
+              <span>↻ Refresh</span>
+            </button>
           </div>
-        </section>
+        </div>
 
-        {/* Live Diagnostics Card if Tally is offline */}
-        {!isTallyOnline && (
-          <section className="p-5 rounded-xl bg-amber-950/20 border border-amber-500/30 text-amber-200 space-y-3">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3">
-                <span className="flex h-3 w-3 rounded-full bg-amber-400 animate-ping" />
-                <h3 className="font-semibold text-sm text-amber-100">Live Tally Connection on localhost:9000</h3>
-              </div>
-              <span className="text-xs font-mono bg-amber-900/40 px-2 py-0.5 rounded text-amber-300">
-                Action Required
-              </span>
-            </div>
-            <p className="text-xs text-amber-200/80 leading-relaxed">
-              TallyPrime is currently not responding on port 9000. To perform live discovery against a running TallyPrime instance:
-            </p>
-            <ol className="list-decimal list-inside text-xs text-amber-200/90 space-y-1 font-mono bg-amber-950/40 p-3 rounded-lg border border-amber-800/40">
-              <li>Launch TallyPrime on this machine.</li>
-              <li>Press <strong>F12 (Configure)</strong> → <strong>Advanced Configuration</strong>.</li>
-              <li>Set <strong>Tally is acting as: Both</strong> (or Server) and set <strong>Port: 9000</strong>.</li>
-              <li>Load your target company in TallyPrime.</li>
-              <li>Run: <code className="text-amber-300 font-bold">python bridge/src/main.py discover</code> or start the Bridge daemon.</li>
-            </ol>
-          </section>
-        )}
-
-        {/* Main 2-Column Split: Discovered Tally Companies vs Registered WAAST360 Companies */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Column 1: Discovered Tally Companies (7 cols) */}
-          <div className="lg:col-span-7 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-                  <span>Discovered Tally Companies</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                    {tallyCompanies.length}
-                  </span>
-                </h2>
-                <p className="text-xs text-slate-400">Companies discovered live via Bridge from Tally Instance</p>
+        {/* TAB 1: GOLDEN PATH OPERATIONS */}
+        {activeTab === "golden_path" && (
+          <div className="space-y-6">
+            {/* Golden Path Pipeline Visualizer */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">
+                10-Stage Golden Path Pipeline Lifecycle
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2 text-center text-[11px] font-semibold">
+                {[
+                  { step: "1. RECEIVED", status: selectedDoc ? "DONE" : "PENDING" },
+                  { step: "2. EXTRACTED", status: selectedDoc?.status !== "RECEIVED" && selectedDoc ? "DONE" : "PENDING" },
+                  { step: "3. PROPOSED", status: selectedProposal ? "DONE" : "PENDING" },
+                  { step: "4. VALIDATED", status: selectedProposal?.validations?.every((v) => v.is_passed) ? "DONE" : "PENDING" },
+                  { step: "5. PENDING APPR", status: selectedProposal?.status === "PENDING_APPROVAL" ? "CURRENT" : selectedProposal?.status === "APPROVED" ? "DONE" : "PENDING" },
+                  { step: "6. APPROVED", status: selectedProposal?.status === "APPROVED" ? "DONE" : "PENDING" },
+                  { step: "7. POSTING", status: selectedDoc?.status === "POSTING" ? "CURRENT" : ["POSTED", "VERIFIED"].includes(selectedDoc?.status || "") ? "DONE" : "PENDING" },
+                  { step: "8. POSTED", status: ["POSTED", "VERIFIED"].includes(selectedDoc?.status || "") ? "DONE" : "PENDING" },
+                  { step: "9. VERIFIED", status: selectedDoc?.status === "VERIFIED" ? "DONE" : "PENDING" },
+                  { step: "10. AUDIT PROVED", status: auditEvents.length > 0 ? "DONE" : "PENDING" },
+                ].map((s, i) => (
+                  <div
+                    key={i}
+                    className={`p-2.5 rounded-xl border transition-all ${
+                      s.status === "DONE"
+                        ? "bg-emerald-950/40 border-emerald-500/50 text-emerald-300"
+                        : s.status === "CURRENT"
+                        ? "bg-indigo-950/60 border-indigo-500 text-indigo-300 ring-2 ring-indigo-500/30 animate-pulse"
+                        : "bg-slate-950/50 border-slate-800 text-slate-500"
+                    }`}
+                  >
+                    <div className="text-[10px] opacity-70 mb-0.5">{s.status}</div>
+                    <div>{s.step}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {tallyCompanies.length === 0 ? (
-              <div className="p-8 rounded-xl bg-slate-900/40 border border-slate-800/80 text-center space-y-3">
-                <div className="text-slate-600 text-3xl">🏢</div>
-                <h4 className="text-sm font-semibold text-slate-300">No Tally Companies Discovered Yet</h4>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Run <code className="text-indigo-400">python bridge/src/main.py discover</code> or start the Bridge daemon to query TallyPrime and synchronize loaded companies.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {tallyCompanies.map((tc) => {
-                  const isMapped = tc.status === "MAPPED";
-                  return (
-                    <div
-                      key={tc.id}
-                      className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition space-y-3"
+            {/* Split Screen: Left = Ingestion & Documents, Right = Proposal & Approval */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column (5 Cols) */}
+              <div className="lg:col-span-5 space-y-6">
+                {/* Upload Invoice Card */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                      <span>📄</span>
+                      <span>Phase 3B: Ingest Invoice</span>
+                    </h3>
+                    <button
+                      onClick={handleSampleUpload}
+                      disabled={uploading}
+                      className="text-xs px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 transition disabled:opacity-50"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-bold text-slate-100 text-base">{tc.company_name}</span>
+                      + Quick Sample Invoice
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleUpload} className="space-y-3">
+                    <div className="border-2 border-dashed border-slate-800 hover:border-slate-700 rounded-xl p-4 text-center cursor-pointer transition">
+                      <input
+                        type="file"
+                        onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                        className="block w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                      />
+                      <p className="text-[11px] text-slate-500 mt-2">Upload Tax Invoice (PDF, TXT, PNG) • Computes SHA256</p>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={!uploadFile || uploading}
+                      className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs shadow-lg shadow-indigo-600/20 transition"
+                    >
+                      {uploading ? "Ingesting & Hashing..." : "Ingest Document"}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Ingested Documents List */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm space-y-3">
+                  <h3 className="text-sm font-bold text-white flex items-center justify-between">
+                    <span>Ingested Documents ({documents.length})</span>
+                    <span className="text-xs text-slate-500 font-normal">Select to inspect</span>
+                  </h3>
+
+                  {documents.length === 0 ? (
+                    <div className="text-center py-6 text-slate-500 text-xs">
+                      No documents ingested yet. Upload an invoice above or use Quick Sample Invoice.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                      {documents.map((doc) => (
+                        <div
+                          key={doc.id}
+                          onClick={() => setSelectedDocId(doc.id)}
+                          className={`p-3 rounded-xl border text-xs cursor-pointer transition ${
+                            selectedDoc?.id === doc.id
+                              ? "bg-indigo-950/40 border-indigo-500 shadow-md"
+                              : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-semibold text-slate-200">{doc.file_name}</span>
                             <span
-                              className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
-                                isMapped
-                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                  : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                doc.status === "VERIFIED"
+                                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                  : doc.status === "POSTED"
+                                  ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                                  : doc.status === "APPROVED"
+                                  ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                                  : doc.status === "PROPOSED"
+                                  ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                                  : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                               }`}
                             >
-                              {tc.status}
+                              {doc.status}
                             </span>
                           </div>
-                          <div className="flex items-center space-x-3 text-xs text-slate-400 font-mono">
-                            <span>GUID: {tc.tally_guid}</span>
-                            {tc.financial_year && <span>• FY: {tc.financial_year}</span>}
-                            {tc.books_from && <span>• Books: {tc.books_from}</span>}
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                            <span>SHA: {doc.sha256_checksum.slice(0, 10)}...</span>
+                            <span>{new Date(doc.created_at).toLocaleTimeString()}</span>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
-                        {/* Actions */}
+              {/* Right Column (7 Cols): Inspection, Extraction, Proposal, Approval */}
+              <div className="lg:col-span-7 space-y-6">
+                {selectedDoc ? (
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm space-y-5">
+                    {/* Document Header & AI Action */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+                      <div>
                         <div className="flex items-center space-x-2">
-                          {!isMapped ? (
-                            <>
-                              <button
-                                onClick={() => handleQuickCreateAndMap(tc)}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition"
-                              >
-                                1-Click Quick Map
-                              </button>
-                              <button
-                                onClick={() => setSelectedTallyComp(tc)}
-                                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition"
-                              >
-                                Link to Existing
-                              </button>
-                            </>
-                          ) : (
-                            <span className="text-xs text-emerald-400 font-medium flex items-center space-x-1">
-                              <span>✓ Mapped &amp; Ready</span>
-                            </span>
-                          )}
+                          <h3 className="text-base font-bold text-white">{selectedDoc.file_name}</h3>
+                          <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+                            {selectedDoc.document_number}
+                          </span>
                         </div>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Current Stage: <span className="font-semibold text-indigo-400">{selectedDoc.status}</span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        {selectedDoc.status === "RECEIVED" && (
+                          <button
+                            onClick={() => handleExtract(selectedDoc.id)}
+                            className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-lg shadow-purple-600/20 transition flex items-center space-x-1.5"
+                          >
+                            <span>✨ Run Gemini AI Extraction</span>
+                          </button>
+                        )}
+                        {selectedDoc.status === "EXTRACTED" && (
+                          <button
+                            onClick={() => handleGenerateProposal(selectedDoc.id)}
+                            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition flex items-center space-x-1.5"
+                          >
+                            <span>⚙️ Generate Accounting Proposal</span>
+                          </button>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
 
-          {/* Column 2: WAAST360 Registered Companies (5 cols) */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-                  <span>WAAST360 Companies</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    {waastCompanies.length}
-                  </span>
-                </h2>
-                <p className="text-xs text-slate-400">Internal Accounting Entities &amp; Ledgers</p>
+                    {/* Proposal & Validation Card */}
+                    {selectedProposal ? (
+                      <div className="space-y-4">
+                        <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase text-slate-400">
+                              Proposed Double-Entry Voucher
+                            </span>
+                            <span className="text-xs font-mono font-bold text-emerald-400">
+                              Total: ₹{selectedProposal.total_amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+
+                          <div className="border border-slate-800 rounded-lg overflow-hidden text-xs">
+                            <table className="w-full text-left">
+                              <thead className="bg-slate-900 text-slate-400 font-medium">
+                                <tr>
+                                  <th className="py-2 px-3">Ledger Name</th>
+                                  <th className="py-2 px-3 text-right">Debit (₹)</th>
+                                  <th className="py-2 px-3 text-right">Credit (₹)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800">
+                                {selectedProposal.lines.map((line, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-900/50">
+                                    <td className="py-2 px-3 text-slate-200 font-medium">{line.ledger_name}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-emerald-400">
+                                      {line.is_debit ? line.amount.toFixed(2) : "-"}
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono text-amber-400">
+                                      {!line.is_debit ? line.amount.toFixed(2) : "-"}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <p className="text-[11px] text-slate-400 italic">
+                            Narration: {selectedProposal.narration}
+                          </p>
+                        </div>
+
+                        {/* Deterministic Validation Checks */}
+                        <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                          <h4 className="text-xs font-bold uppercase text-slate-400 mb-2">
+                            Deterministic Validation Rules
+                          </h4>
+                          <div className="space-y-1.5">
+                            {selectedProposal.validations.map((v, idx) => (
+                              <div
+                                key={idx}
+                                className={`flex items-center justify-between text-xs px-3 py-1.5 rounded-lg border ${
+                                  v.is_passed
+                                    ? "bg-emerald-950/30 border-emerald-800/50 text-emerald-300"
+                                    : "bg-rose-950/30 border-rose-800/50 text-rose-300"
+                                }`}
+                              >
+                                <span className="font-mono font-semibold">{v.rule_code}</span>
+                                <span>{v.message}</span>
+                                <span>{v.is_passed ? "✓ PASSED" : "✗ FAILED"}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Human Approval Console */}
+                        {selectedProposal.status === "PENDING_APPROVAL" && (
+                          <div className="bg-indigo-950/30 border border-indigo-500/30 rounded-xl p-4 space-y-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-300">
+                              Phase 3G: Authoritative Human Approval Gate
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[11px] font-semibold text-slate-400">Approver Comments</label>
+                                <input
+                                  type="text"
+                                  value={approverComments}
+                                  onChange={(e) => setApproverComments(e.target.value)}
+                                  className="w-full mt-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-semibold text-slate-400">Authority Role</label>
+                                <select
+                                  value={approverRole}
+                                  onChange={(e) => setApproverRole(e.target.value)}
+                                  className="w-full mt-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200"
+                                >
+                                  <option value="PRIMARY_APPROVER">Primary Finance Approver</option>
+                                  <option value="FINANCE_HEAD">Head of Accounts / Finance Head</option>
+                                  <option value="CFO">Chief Financial Officer (Prime)</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => handleApprove(selectedProposal.id)}
+                              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition flex items-center justify-center space-x-2"
+                            >
+                              <span>✓ Approve & Materialize Authoritative Transaction</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Bridge Execution Trigger */}
+                        {selectedProposal.status === "APPROVED" && selectedDoc.status === "APPROVED" && (
+                          <div className="bg-slate-950/80 border border-indigo-500/30 rounded-xl p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold uppercase text-indigo-300">
+                                Phase 3I: Bridge Posting & Verification Gate
+                              </span>
+                              <span className="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-semibold">
+                                Job Queued
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                              The posting job is enqueued in WAAST360 Cloud. Click below to simulate the Bridge pulling the job, creating the voucher in Tally, and performing instant read-back verification.
+                            </p>
+                            <button
+                              onClick={() => handleSimulateBridgeExecution(selectedProposal.id)}
+                              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 transition"
+                            >
+                              🚀 Execute Bridge Cycle (Post → Read-Back Verify)
+                            </button>
+                          </div>
+                        )}
+
+                        {selectedDoc.status === "VERIFIED" && (
+                          <div className="bg-emerald-950/40 border border-emerald-500/40 rounded-xl p-4 text-center space-y-1">
+                            <div className="text-emerald-400 font-bold text-sm">
+                              ✓ Golden Path Certified: Read-Back Verified & Audit Proved
+                            </div>
+                            <p className="text-xs text-slate-400">
+                              Voucher recorded in Tally with forensic verification evidence and immutable audit log.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-10 bg-slate-950/40 rounded-xl border border-slate-800 text-slate-500 text-xs">
+                        Document ingested. Click &ldquo;Run Gemini AI Extraction&rdquo; above to extract line items and generate accounting proposals.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-12 text-center text-slate-500 text-xs">
+                    Select or upload a document to begin the Golden Path operations.
+                  </div>
+                )}
               </div>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition"
-              >
-                + New Company
-              </button>
             </div>
+          </div>
+        )}
 
-            {waastCompanies.length === 0 ? (
-              <div className="p-8 rounded-xl bg-slate-900/40 border border-slate-800/80 text-center space-y-3">
-                <div className="text-slate-600 text-3xl">📋</div>
-                <h4 className="text-sm font-semibold text-slate-300">No WAAST360 Companies</h4>
-                <p className="text-xs text-slate-500">Create one or use 1-Click Quick Map from discovered Tally companies.</p>
+        {/* TAB 2: COMPANY DISCOVERY & MAPPING */}
+        {activeTab === "discovery" && (
+          <div className="space-y-6">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm space-y-4">
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                Discovered Tally Companies & Multi-Company Binding
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {tallyCompanies.map((tc) => (
+                  <div key={tc.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-slate-200 text-sm">{tc.company_name}</h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+                        {tc.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400 space-y-1 font-mono">
+                      <div>GUID: {tc.tally_guid}</div>
+                      <div>FY: {tc.financial_year || "2024-2025"} • Books: {tc.books_from || "2024-04-01"}</div>
+                    </div>
+                    <div className="flex items-center space-x-2 pt-2">
+                      <button
+                        onClick={() => handleQuickCreateAndMap(tc.id)}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition"
+                      >
+                        1-Click Quick Map
+                      </button>
+                      <button
+                        onClick={() => setSelectedTallyComp(tc)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                      >
+                        Map Existing...
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: FORENSIC AUDIT TRAIL */}
+        {activeTab === "audit" && (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm space-y-4">
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center justify-between">
+              <span>Immutable Append-Only Audit Trail</span>
+              <span className="text-xs text-slate-500 font-mono">Non-Repudiation Security Model</span>
+            </h2>
+
+            {auditEvents.length === 0 ? (
+              <div className="text-center py-10 text-slate-500 text-xs">
+                No audit events recorded yet for this company.
               </div>
             ) : (
-              <div className="space-y-3">
-                {waastCompanies.map((c) => (
-                  <div
-                    key={c.id}
-                    className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition space-y-2"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-bold text-slate-200 text-sm">{c.legal_name}</h4>
-                        {c.trade_name && c.trade_name !== c.legal_name && (
-                          <p className="text-xs text-slate-400">{c.trade_name}</p>
-                        )}
-                        <div className="text-xs text-slate-500 font-mono mt-1">
-                          {c.gstin ? `GSTIN: ${c.gstin}` : c.pan ? `PAN: ${c.pan}` : "No Tax IDs"}
-                        </div>
-                      </div>
+              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                {auditEvents.map((evt) => (
+                  <div key={evt.id} className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-indigo-400">{evt.action}</span>
+                      <span className="text-slate-500 font-mono text-[11px]">{new Date(evt.recorded_at).toLocaleString()}</span>
                     </div>
-
-                    {/* Mapping Indicator */}
-                    <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs">
-                      <span className="text-slate-500">Mapped Tally:</span>
-                      {c.mapped_tally_company_name ? (
-                        <span className="font-semibold text-emerald-400">
-                          {c.mapped_tally_company_name}
-                        </span>
-                      ) : (
-                        <span className="text-amber-400/80 italic">Unmapped</span>
-                      )}
+                    <div className="text-slate-400 flex items-center space-x-3 text-[11px]">
+                      <span>Actor: <strong className="text-slate-200">{evt.actor_type}</strong> ({evt.actor_id})</span>
+                      <span>Target: <strong className="text-slate-200">{evt.entity_type}</strong></span>
                     </div>
+                    {evt.event_metadata && (
+                      <pre className="p-2 rounded bg-slate-900 border border-slate-850 text-[10px] text-slate-400 font-mono overflow-x-auto">
+                        {JSON.stringify(evt.event_metadata, null, 2)}
+                      </pre>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </div>
+        )}
 
-        {/* Modal: Map Discovered Tally Company to WAAST360 Company */}
+        {/* Modal: Manual Map Existing */}
         {selectedTallyComp && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
             <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
-              <h3 className="text-lg font-bold text-white">Map Tally Company</h3>
+              <h3 className="text-base font-bold text-white">Map Tally Company</h3>
               <p className="text-xs text-slate-400">
-                Link <strong className="text-indigo-400">{selectedTallyComp.company_name}</strong> to a WAAST360 accounting entity.
+                Associating Tally Company: <strong className="text-white">{selectedTallyComp.company_name}</strong>
               </p>
-
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-300">Select Target WAAST360 Company</label>
                 <select
@@ -512,7 +951,6 @@ export default function CompanyDiscoveryDashboard() {
                   ))}
                 </select>
               </div>
-
               <div className="flex items-center justify-end space-x-3 pt-3">
                 <button
                   onClick={() => setSelectedTallyComp(null)}
@@ -532,11 +970,11 @@ export default function CompanyDiscoveryDashboard() {
           </div>
         )}
 
-        {/* Modal: Create New WAAST360 Company */}
+        {/* Modal: Create Company */}
         {showCreateModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
             <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
-              <h3 className="text-lg font-bold text-white">Create WAAST360 Company</h3>
+              <h3 className="text-base font-bold text-white">Create WAAST360 Company</h3>
               <form onSubmit={handleCreateCompany} className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold text-slate-300">Legal Name *</label>

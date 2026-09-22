@@ -18,13 +18,15 @@ class BridgeDaemon:
     maintains a local durable queue, and executes jobs safely with reconciliation.
     """
 
-    def __init__(self, settings: BridgeSettings | None = None):
+    def __init__(self, settings: BridgeSettings | None = None, use_simulated: bool = False):
         self.settings = settings or bridge_settings
         self.adapter = get_tally_adapter(
             host=self.settings.TALLY_HOST,
             port=self.settings.TALLY_PORT,
             prefer_json=self.settings.PREFER_JSON,
+            use_simulated=use_simulated,
         )
+
         db_path = self.settings.DB_PATH if self.settings.DB_PATH else None
         self.store = BridgeLocalStore(db_path=db_path)
         self.transport = PollingTransport(

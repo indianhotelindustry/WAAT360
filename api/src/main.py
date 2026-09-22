@@ -1,8 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.routers.approvals import router as approvals_router
 from src.routers.bridge import router as bridge_router
 from src.routers.companies import router as companies_router
+from src.routers.documents import router as documents_router
+from src.routers.proposals import router as proposals_router
 
 app = FastAPI(title="WAAST360 Core API", version="0.1.0")
 
@@ -17,6 +20,9 @@ app.add_middleware(
 
 app.include_router(bridge_router)
 app.include_router(companies_router)
+app.include_router(documents_router)
+app.include_router(proposals_router)
+app.include_router(approvals_router)
 
 
 @app.get("/")

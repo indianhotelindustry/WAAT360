@@ -27,3 +27,7 @@ out/
 *.sqlite3
 .vscode/
 .idea/
+
+# Uploads
+api/uploads/*
+!api/uploads/.gitkeep

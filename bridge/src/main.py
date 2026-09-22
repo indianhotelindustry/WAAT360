@@ -15,7 +15,12 @@ from src.transport.polling import PollingTransport
 
 def cmd_test_tally(args):
     print(f"Testing Tally connectivity at http://{args.host}:{args.port}...")
-    adapter = get_tally_adapter(host=args.host, port=args.port, prefer_json=not args.force_xml)
+    adapter = get_tally_adapter(
+        host=args.host,
+        port=args.port,
+        prefer_json=not args.force_xml,
+        use_simulated=args.simulated,
+    )
     status = adapter.get_tally_status()
     print("\n--- TALLY STATUS ---")
     print(f"Online: {status.is_online}")
@@ -31,9 +36,14 @@ def cmd_test_tally(args):
 
 def cmd_discover(args):
     print(f"Querying companies from Tally at http://{args.host}:{args.port}...")
-    adapter = get_tally_adapter(host=args.host, port=args.port, prefer_json=not args.force_xml)
+    adapter = get_tally_adapter(
+        host=args.host,
+        port=args.port,
+        prefer_json=not args.force_xml,
+        use_simulated=args.simulated,
+    )
     companies = adapter.get_companies()
-    print(f"\nDiscovered {len(companies)} company/companies in local Tally:")
+    print(f"\nDiscovered {len(companies)} company/companies in Tally:")
     for c in companies:
         print(
             f"  - Name: {c.name} | GUID: {c.guid or 'N/A'} | FY: {c.financial_year_from or 'N/A'}"
@@ -69,7 +79,7 @@ def cmd_status(args):
 
 
 def cmd_start(args):
-    daemon = BridgeDaemon()
+    daemon = BridgeDaemon(use_simulated=args.simulated)
     try:
         daemon.start()
     except KeyboardInterrupt:
@@ -84,7 +94,12 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", help="Bridge commands")
 
     # start
-    subparsers.add_parser("start", help="Start the Bridge daemon loop")
+    p_start = subparsers.add_parser("start", help="Start the Bridge daemon loop")
+    p_start.add_argument(
+        "--simulated",
+        action="store_true",
+        help="Run against simulated TallyAdapter (for dev & demonstration)",
+    )
 
     # test-tally
     p_test = subparsers.add_parser("test-tally", help="Test local Tally connection & capabilities")
@@ -100,9 +115,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Tally port (default 9000)",
     )
     p_test.add_argument("--force-xml", action="store_true", help="Force XML adapter")
+    p_test.add_argument(
+        "--simulated",
+        action="store_true",
+        help="Use simulated Tally adapter (for dev & demonstration)",
+    )
 
     # discover
-    p_disc = subparsers.add_parser("discover", help="Discover companies in local Tally")
+    p_disc = subparsers.add_parser("discover", help="Discover companies in Tally")
     p_disc.add_argument(
         "--host",
         default=bridge_settings.TALLY_HOST,
@@ -115,6 +135,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Tally port (default 9000)",
     )
     p_disc.add_argument("--force-xml", action="store_true", help="Force XML adapter")
+    p_disc.add_argument(
+        "--simulated",
+        action="store_true",
+        help="Use simulated Tally adapter (for dev & demonstration)",
+    )
 
     # status
     subparsers.add_parser("status", help="Show local queue and diagnostic stats")

@@ -1,50 +1,49 @@
 # ACTIVE WORK — WAAST360
 
 ## 1. Current Workstream
-**AI Continuity & Repository Knowledge Baseline (Handoff Readiness)**
+**Phase 3: WAAST360 Lite Golden Path Execution (Completed)**
 
 ## 2. Current Objective
-Establish a complete, self-contained AI continuity layer inside the repository so that any subsequent AI agent (especially Claude Code or another Gemini instance) can take over engineering immediately upon context expiration without needing chat history or prior conversational memory.
+Completed the complete WAAST360 Lite Golden Path vertical slice under the 10 core architectural controls:
+- [x] `Phase 3A`: TallySimulatedAdapter (Full contract, realistic in-memory Indian GST accounting state)
+- [x] `Phase 3B`: Document Ingestion (SHA256 checksums, duplicate detection, Document & DocumentVersion entities)
+- [x] `Phase 3C`: Gemini Extraction (AIProvider abstraction & GeminiProvider with deterministic fallback)
+- [x] `Phase 3D`: Accounting Proposal (Deterministic double-entry voucher line generation)
+- [x] `Phase 3E`: Rules + GST Validation (VAL-RULE-001 balance check & VAL-RULE-002 GST math invariant)
+- [x] `Phase 3F`: Duplicate Detection (VAL-RULE-003 duplicate invoice reference check)
+- [x] `Phase 3G`: Human Approval (Authoritative human approval gate before transaction materialization)
+- [x] `Phase 3H`: Posting Job (PostingJob queue in PostgreSQL & bridge polling integration)
+- [x] `Phase 3I`: Bridge → Simulated Tally (Bridge execution via TallyAdapter contract)
+- [x] `Phase 3J`: Read-back Verification (Immediate read-back query, VerificationResult entity)
+- [x] `Phase 3K`: Audit Proof (Immutable AuditEvent with full non-repudiation provenance)
+- [x] `Phase 3L`: End-to-End Golden Path Certification (Automated e2e test & interactive Next.js console)
 
-## 3. Files Being Created / Modified
-- [`CLAUDE.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/CLAUDE.md)
-- [`AGENTS.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/AGENTS.md)
-- [`docs/testing/LIVE_TALLY_CERTIFICATION_GATE.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/testing/LIVE_TALLY_CERTIFICATION_GATE.md)
-- `docs/AI/` directory:
-  - [`AI_HANDOFF.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/AI_HANDOFF.md)
-  - [`CURRENT_STATE.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/CURRENT_STATE.md)
-  - [`ACTIVE_WORK.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/ACTIVE_WORK.md)
-  - [`NEXT_ACTIONS.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/NEXT_ACTIONS.md)
-  - [`DECISIONS.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/DECISIONS.md)
-  - [`KNOWN_ISSUES.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/KNOWN_ISSUES.md)
-  - [`VERIFICATION_STATUS.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/VERIFICATION_STATUS.md)
-  - [`ARCHITECTURE_CONTEXT.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/ARCHITECTURE_CONTEXT.md)
-  - [`PRODUCT_CONTEXT.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/PRODUCT_CONTEXT.md)
-  - [`ENVIRONMENT.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/ENVIRONMENT.md)
-  - [`RECOVERY_PROMPT.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/RECOVERY_PROMPT.md)
-  - [`SESSION_LOG.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/SESSION_LOG.md)
-  - [`DOCUMENTATION_DRIFT.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/AI/DOCUMENTATION_DRIFT.md)
+## 3. Files Created / Modified
+### Cloud API (`api/`)
+- `src/ai/base.py`: AIProvider abstract interface.
+- `src/ai/models.py`: ExtractedInvoiceData, ExtractedLineItem.
+- `src/ai/gemini_provider.py`: GeminiProvider with deterministic fallback.
+- `src/ai/factory.py`: get_ai_provider().
+- `src/services/validation_engine.py`: Deterministic balance, GST math, duplicate rules.
+- `src/services/proposal_engine.py`: Double-entry voucher generation.
+- `src/routers/documents.py`: Document ingestion and extraction endpoints.
+- `src/routers/proposals.py`: Accounting proposal generation and validation listing.
+- `src/routers/approvals.py`: Human approval and transaction/posting-job materialization.
+- `src/routers/bridge.py`: Posting attempts, read-back verification evidence, and audit events.
+- `src/main.py`: Routers mounted.
+- `tests/test_golden_path_e2e.py`: Full 10-stage end-to-end automated certification test.
 
-## 4. Expected Outcome
-The repository becomes 100% self-explanatory and resilient to AI agent context expiration or switching. All facts, architecture, test commands, database states, and next tasks are fully documented from actual repository ground truth.
+### Bridge Client (`bridge/`)
+- `src/adapters/simulated_adapter.py`: High-fidelity simulated adapter maintaining realistic GST state.
+- `src/adapters/factory.py`: Auto-switch for simulated vs live adapters.
+- `src/daemon.py`: CLI support for simulated mode.
+- `src/main.py`: CLI `--simulated` flag.
+- `tests/test_simulated_adapter.py`: 4 comprehensive unit tests.
 
-## 5. Dependencies
-- Repository file system and Git tracking.
-- Test suites (`api`, `bridge`, `web`).
+### Web Console (`web/`)
+- `src/app/page.tsx`: Golden Path interactive operations console, 10-stage lifecycle visualizer, invoice upload, proposal review, approval, simulated bridge execution trigger, and audit log.
 
-## 6. Risks & Mitigation
-- **Risk**: Overwriting existing locked product documentation.
-  - **Mitigation**: Existing files in `docs/architecture/`, `docs/domain/`, `docs/product/`, etc., are preserved intact and indexed.
-- **Risk**: Secret leakage in continuity documents.
-  - **Mitigation**: Zero credentials/passwords recorded; environment variable placeholders used throughout.
-
-## 7. Verification Required
-- Run `pytest` on `api/` (12 tests).
-- Run `pytest` on `bridge/` (16 tests).
-- Run `npm run lint` and `npm run build` on `web/`.
-- Run `ruff check` on both Python codebases.
-- Verify Git status and cleanliness.
-
-## 8. Explicitly Out of Scope for This Task
-- Implementing new feature code (AI extraction, document upload, or proposal routers).
-- Running live Tally integration against the development laptop (where Tally is not installed).
+## 4. Verification Completed
+- `api/`: 13/13 tests passing, 0 ruff errors.
+- `bridge/`: 20/20 tests passing, 0 ruff errors.
+- `web/`: Next.js 16 build passing (Turbopack, 0 TypeScript errors).

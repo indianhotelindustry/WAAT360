@@ -1,7 +1,9 @@
 import logging
+import os
 
 from src.adapters.base import TallyAdapter
 from src.adapters.json_adapter import TallyJsonAdapter
+from src.adapters.simulated_adapter import TallySimulatedAdapter
 from src.adapters.xml_adapter import TallyXmlAdapter
 
 logger = logging.getLogger("waast_bridge.adapters")
@@ -12,12 +14,18 @@ def get_tally_adapter(
     port: int = 9000,
     prefer_json: bool = True,
     timeout_seconds: float = 10.0,
+    use_simulated: bool = False,
 ) -> TallyAdapter:
     """
     Factory function to select and instantiate the appropriate TallyAdapter.
-    Prefers TallyJsonAdapter if Tally supports native JSON (TallyPrime 7.0+),
-    otherwise gracefully falls back to TallyXmlAdapter.
+    - If use_simulated or SIMULATED_TALLY=true, returns TallySimulatedAdapter for dev/testing.
+    - Prefers TallyJsonAdapter if Tally supports native JSON (TallyPrime 7.0+).
+    - Gracefully falls back to TallyXmlAdapter for standard compatibility.
     """
+    if use_simulated or os.environ.get("SIMULATED_TALLY", "").lower() in ("true", "1", "yes"):
+        logger.info("Using TallySimulatedAdapter (simulated Indian GST accounting state).")
+        return TallySimulatedAdapter(host=host, port=port, timeout_seconds=timeout_seconds)
+
     if prefer_json:
         json_adapter = TallyJsonAdapter(host=host, port=port, timeout_seconds=timeout_seconds)
         try:

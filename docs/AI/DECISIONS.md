@@ -165,3 +165,41 @@ This document tracks all locked, active, and foundational architectural decision
 - **Decision**: Internal database primary keys use time-ordered UUIDv7 (generated natively via Python 3.14 `uuid.uuid7()`).
 - **Rationale**: Combines the distributed creation benefits of UUIDs with the B-tree indexing performance of sequential IDs.
 - **Implication**: Sequential integer IDs are not used as domain primary keys.
+
+---
+
+### DEC-019: TallySimulatedAdapter Contract Fidelity & Realistic GST State
+- **Status**: LOCKED
+- **Date**: 2026-09-22
+- **Decision**: `TallySimulatedAdapter` implements the exact identical `TallyAdapter` abstract interface with zero special shortcuts. It maintains realistic Indian GST accounting state (Purchase A/c, CGST 9%, SGST 9%, IGST 18%, Creditors, Debtors), sequential voucher numbers (`PUR/2026/0001`), and idempotent deduplication.
+- **Rationale**: Allows developer iteration and automated end-to-end integration testing without creating a second shortcut architecture for demos.
+- **Implication**: Switching between simulation and live Tally requires only changing the adapter instance at runtime.
+
+---
+
+### DEC-020: Deterministic Rules Engine Preceding Approval
+- **Status**: LOCKED
+- **Date**: 2026-09-22
+- **Decision**: AI extraction output must pass deterministic accounting validation rules (`VAL-RULE-001` double-entry balance, `VAL-RULE-002` GST math invariant, `VAL-RULE-003` duplicate reference detection) and explicit human approval before any transaction or posting job is materialized.
+- **Rationale**: Eliminates AI hallucination risks in statutory double-entry accounting.
+- **Implication**: AI proposes; rules validate; human approves; only approved proposals materialize into immutable transactions.
+
+---
+
+### DEC-021: Provider-Agnostic AI Extraction Layer
+- **Status**: LOCKED
+- **Date**: 2026-09-22
+- **Decision**: AI invoice extraction is encapsulated behind `AIProvider` (`src.ai.base`), with `GeminiProvider` as the primary implementation and a deterministic fallback when offline or lacking API keys.
+- **Rationale**: Prevents vendor lock-in to Gemini and enables easy pluggability for other models (Claude, local OCR) in future Prime releases.
+- **Implication**: Core application code interacts only with `AIProvider.extract_invoice()`.
+
+---
+
+### DEC-022: Explicit 10-Stage Lifecycle State Machine
+- **Status**: LOCKED
+- **Date**: 2026-09-22
+- **Decision**: Every document in the Golden Path traverses explicit states:
+  $$\text{RECEIVED} \rightarrow \text{EXTRACTED} \rightarrow \text{PROPOSED} \rightarrow \text{VALIDATED} \rightarrow \text{PENDING\_APPROVAL} \rightarrow \text{APPROVED} \rightarrow \text{POSTING} \rightarrow \text{POSTED} \rightarrow \text{VERIFIED}$$
+- **Rationale**: Full traceability across automated and human gates; failure states (`DUPLICATE_FLAGGED`, `VALIDATION_FAILED`, `REJECTED`) are strictly distinguished.
+- **Implication**: API endpoints, database status columns, and frontend UI visualizer adhere to this exact state progression.
+
