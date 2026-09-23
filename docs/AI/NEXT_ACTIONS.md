@@ -12,8 +12,9 @@ This backlog defines the exact, prioritized execution sequence for incoming engi
 
 ---
 
-## Completed Tasks (Phases 3A – 3L, Phase 5, Phase 6)
+## Completed Tasks (Phases 3A – 3L, Phase 5, Phase 6, Phase 7 Partial)
 
+- [x] **[P0] TASK-DEP-01: Client Deployment & Office Machine Installer** (Commit 6343df0; install/uninstall scripts, configuration hardening, 89/89 tests passing, pre-commit security verification complete).
 - [x] **[P0] TASK-GP-01: Document Ingestion & Storage Foundation** (`POST /api/v1/documents/upload`, SHA256 checksum, duplicate detection).
 - [x] **[P0] TASK-GP-02: AI Provider Abstraction & Gemini Implementation** (`AIProvider`, `GeminiProvider`, `POST /api/v1/documents/{id}/extract`).
 - [x] **[P1] TASK-GP-03: Structured Accounting Proposal & Deterministic Rules Validation** (`ProposalEngine`, `ValidationEngine`, `VAL-RULE-001`, `VAL-RULE-002`, `VAL-RULE-003`).
@@ -35,21 +36,29 @@ This backlog defines the exact, prioritized execution sequence for incoming engi
 
 ## Next Backlog Queue
 
-### [P0] TASK-DEP-01: Client Deployment & Office Machine Installer
-- **Why**: Prepare the Bridge distribution bundle for installation on the client's Windows office machine where live TallyPrime is hosted.
-- **Expected Files**:
-  - `bridge/scripts/install_service.ps1`: Windows Service installation script for unattended background operation.
-  - `bridge/scripts/run_bridge.bat`: Quick-start launcher.
+### [P0] TASK-TALLY-INT-01: Local Real TallyPrime 7.1 Integration Testing (NEW)
+- **Why**: Validate Bridge against real TallyPrime instance before client deployment to identify any adapter compatibility or operational issues.
+- **Location**: Development laptop (requires TallyPrime 7.1 installation with HTTP/ODBC enabled on port 9000).
 - **Acceptance Criteria**:
-  - Standalone execution on Windows 10/11/Server.
-  - Configures `BRIDGE_API_KEY` and points outbound to Cloud API.
+  1. Bridge `test-tally` command confirms connectivity and capabilities
+  2. Bridge `discover` command retrieves real company list from Tally
+  3. Cloud API receives and stores discovered companies
+  4. Test voucher created and posted to real Tally via Bridge
+  5. Read-back verification retrieves voucher from Tally and validates data
+  6. Service runs stably for 10+ cycles without errors
+- **Deliverables**:
+  - Live test results documented in VERIFICATION_STATUS.md
+  - Any Tally adapter bugs identified and fixed
+  - Configuration or operational issues resolved before client deployment
 
 ---
 
-### [P0] TASK-CERT-01: LIVE-TALLY-CERT-001 Live Execution
+### [P0] TASK-CERT-01: LIVE-TALLY-CERT-001 Client Machine Certification
 - **Why**: Deployment certification gate on the client's office machine.
 - **Location**: Client Office Machine (running live TallyPrime on `localhost:9000`).
-- **Dependencies**: TASK-DEP-01.
+- **Dependencies**: 
+  - TASK-DEP-01 (✅ COMPLETE)
+  - TASK-TALLY-INT-01 (IN PROGRESS — local TallyPrime integration must pass first)
 - **Acceptance Criteria**:
   - Satisfy all 5 gates in [`docs/testing/LIVE_TALLY_CERTIFICATION_GATE.md`](file:///c:/Users/SIPL%20Server/Downloads/DSS/WAAST360/docs/testing/LIVE_TALLY_CERTIFICATION_GATE.md):
     1. Connectivity to port 9000.
@@ -57,6 +66,7 @@ This backlog defines the exact, prioritized execution sequence for incoming engi
     3. Master extraction reads live ledgers.
     4. Test purchase voucher posted to real Tally.
     5. Read-back verification confirms voucher in Tally Daybook.
+  - Note: LIVE-TALLY-CERT-001 remains PENDING until executed on client machine. Do not claim certification complete without real Tally evidence.
 
 ---
 

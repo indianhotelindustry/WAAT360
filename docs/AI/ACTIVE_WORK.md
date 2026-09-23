@@ -1,9 +1,28 @@
 # ACTIVE WORK — WAAST360
 
 ## 1. Current Workstream
+**Phase 7: Windows Service Deployment & Real Tally Integration Testing (In Progress)**
+
+### TASK-DEP-01: Windows Service Deployment ✅ CERTIFIED
+- Commit: 6343df0
+- Status: Complete and tested
+- Regression: 89/89 tests passing (45 Bridge + 20 API + linting/build)
+- Security: Pre-commit verification passed; no secrets committed
+- Deployment Files: install_service.ps1, uninstall_service.ps1, run_bridge.bat, configuration validation tests
+- Note: LIVE-TALLY-CERT-001 remains PENDING (real TallyPrime validation required)
+
+### Next Phase: Local Real TallyPrime 7.1 Integration
+- Test against real TallyPrime instance (not simulated adapter)
+- Verify HTTP server on port 9000
+- Test company discovery and synchronization
+- Test live voucher posting and read-back verification
+
+---
+
+## 2. Phase 6 Summary (Previous)
 **Phase 6: Knowledge Core + Accounting Health Check + Lite Theme + Company Intelligence View (Completed)**
 
-## 2. Phase 6 Objective & Delivery
+## 3. Phase 6 Objective & Delivery
 Delivered the Knowledge Core, forensic Accounting Health Check, correction lifecycle, and Company Intelligence frontend:
 
 - [x] **Knowledge Core with Provenance**: `KnowledgeItem` (FACT/RULE/RECOMMENDATION/DECISION) with `source`, `jurisdiction`, `effective_from`, `effective_until`, `rule_version`, `status`. No tax/legal rule stored without authoritative provenance.

@@ -4,8 +4,9 @@
 - **Project**: WAAST360 (Wise Accounting Automation System for Tally)
 - **Current Product**: WAAST360 Lite
 - **Strategic Direction**: Commercial Lite release built strictly on a Prime-grade architectural foundation.
-- **Current Development Phase**: **Phase 6: Knowledge Core + Accounting Health Check + Company Intelligence View (Complete)**.
+- **Current Development Phase**: **Phase 7: Windows Service Deployment & Real Tally Integration Testing**.
 - **Current Gate**: **`LIVE-TALLY-CERT-001`** (Status: **PENDING** — target is client's office machine).
+- **Latest Deployment**: **TASK-DEP-01 CERTIFIED** (commit 6343df0) — Windows Service installer, configuration hardening, 89/89 tests passing.
 
 ---
 
