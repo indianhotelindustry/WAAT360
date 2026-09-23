@@ -21,6 +21,7 @@ This backlog defines the exact, prioritized execution sequence for incoming engi
 - [x] **[P1] TASK-GP-05: Bridge Posting Execution & Read-Back Verification** (`TallySimulatedAdapter`, `PostingAttempt`, `PostingResponse`, `VerificationResult`, `AuditEvent`).
 - [x] **[P1] TASK-GP-06: Golden Path Frontend UI Console** (Next.js 16 interactive dashboard with 10-stage pipeline, invoice ingestion, approval console, and forensic audit timeline).
 - [x] **[P2] TASK-POL-01: Bridge Simulated Adapter CLI Flag** (`python src/main.py start --simulated`, `--simulated` flag on `test-tally` and `discover`).
+- [x] **[P0] TASK-CMD-01: Enterprise Command Center & Real-Data Simulator** (Enterprise SaaS UI, real database KPI summary endpoint, simulator cycle execution via `TallySimulatedAdapter`, page reload persistence, `.env.example`).
 
 ---
 

@@ -235,6 +235,45 @@ def extract_document(
     )
 
 
+@router.get("/{document_id}/extraction", response_model=Optional[DocumentExtractionResponse])
+def get_document_extraction(
+    document_id: str,
+    db: Session = Depends(get_db),
+):
+    """Retrieve persisted AI extraction for a document across browser reloads."""
+    try:
+        doc_uuid = uuid.UUID(document_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid document ID")
+
+    doc = db.scalar(select(Document).where(Document.id == doc_uuid, Document.is_deleted.is_(False)))
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    version = doc.versions[0] if doc.versions else None
+    if not version or not version.extractions:
+        return None
+
+    extraction = version.extractions[0]
+    if not extraction.raw_response_json:
+        return None
+
+    try:
+        extracted = ExtractedInvoiceData.model_validate(extraction.raw_response_json)
+    except Exception:
+        return None
+
+    return DocumentExtractionResponse(
+        document_id=str(doc.id),
+        extraction_id=str(extraction.id),
+        ai_provider=extraction.ai_provider,
+        model_name=extraction.model_name,
+        confidence_score=float(extraction.confidence_score) if extraction.confidence_score else None,
+        status=doc.status,
+        extracted_data=extracted,
+    )
+
+
 @router.get("", response_model=List[DocumentResponse])
 def list_documents(
     company_id: Optional[str] = None,

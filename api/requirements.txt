@@ -11,3 +11,5 @@ pytest>=9.1.0
 ruff>=0.16.0
 httpx2>=2.13.0
 python-multipart>=0.0.20
+requests>=2.31.0
+defusedxml>=0.7.1

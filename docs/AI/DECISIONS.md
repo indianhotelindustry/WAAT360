@@ -203,3 +203,18 @@ This document tracks all locked, active, and foundational architectural decision
 - **Rationale**: Full traceability across automated and human gates; failure states (`DUPLICATE_FLAGGED`, `VALIDATION_FAILED`, `REJECTED`) are strictly distinguished.
 - **Implication**: API endpoints, database status columns, and frontend UI visualizer adhere to this exact state progression.
 
+---
+
+### DEC-023: Client Demo Command Center & Authoritative Simulator Integrity
+- **Status**: LOCKED
+- **Date**: 2026-09-23
+- **Decision**:
+  1. Frontend presentation uses an enterprise-grade Command Center UI (Deep Navy `#0F172A` navigation, clean SaaS body `#F8FAFC`, tailored financial typography).
+  2. Simulator integrity: All simulation actions (`POST /api/v1/bridge/jobs/{id}/simulate-cycle`) execute strictly through the real `TallySimulatedAdapter` in the Bridge layer, writing `PostingAttempt`, `PostingResponse`, forensic `VerificationResult`, advancing state to `VERIFIED`, and appending immutable `AuditEvent`s. Zero client-side fake voucher strings or mock amounts are permitted.
+  3. Authoritative KPIs: `GET /api/v1/dashboard/summary` computes metrics dynamically from authoritative PostgreSQL records (`Document`, `AccountingProposal`, `PostingJob`, `VerificationResult`, `DomainException`).
+  4. Demo vs. Live transparency: 🟡 `DEMO MODE (Simulated Tally)` vs 🟢 `LIVE MODE (TallyPrime Connected)` is strictly derived from server runtime state and adapter classification.
+  5. Persistence across refresh: REST query endpoints (`GET /documents/{id}/extraction`, enhanced `GET /proposals`) ensure complete workflow state reconstructs cleanly upon browser reload.
+  6. Configurable API URL: Cloud dashboard relies on `NEXT_PUBLIC_API_BASE_URL` with `.env.example` contract.
+- **Rationale**: Prevents demo falsification, proves system architecture to technical and executive stakeholders, and guarantees seamless transition from simulation to live TallyPrime on client office deployment.
+- **Implication**: Both demo and production utilize identical database schemas, domain entities, and adapter contracts.
+

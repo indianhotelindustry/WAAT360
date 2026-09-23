@@ -12,6 +12,9 @@ from src.core.database import get_db
 from src.models.entities import (
     AccountingProposal,
     Document,
+    Ledger,
+    PostingJob,
+    Transaction,
     ValidationResult,
 )
 from src.services.proposal_engine import ProposalEngine
@@ -48,6 +51,15 @@ class AccountingProposalResponse(BaseModel):
     status: str
     lines: list[ProposalLineResponse]
     validations: list[ValidationCheckResponse]
+    transaction_id: Optional[str] = None
+    posting_job_id: Optional[str] = None
+    posting_status: Optional[str] = None
+    tally_voucher_number: Optional[str] = None
+    tally_guid: Optional[str] = None
+    actual_amount: Optional[float] = None
+    expected_amount: Optional[float] = None
+    verification_status: Optional[str] = None
+    verified_at: Optional[str] = None
 
 
 # =========================================================================
@@ -177,7 +189,7 @@ def list_proposals(
     company_id: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    """List accounting proposals with current review status."""
+    """List accounting proposals with current review status and persisted verification details."""
     query = (
         select(AccountingProposal)
         .where(AccountingProposal.is_deleted == False)  # noqa: E712
@@ -198,6 +210,77 @@ def list_proposals(
             )
             for v in p.validations
         ]
+
+        # 1. Resolve lines: from TransactionLine if approved, else from DocumentExtraction
+        lines: list[ProposalLineResponse] = []
+        txn = db.scalar(
+            select(Transaction).where(Transaction.accounting_proposal_id == p.id)
+        )
+        if txn and txn.lines:
+            for line in txn.lines:
+                ledger = db.scalar(select(Ledger).where(Ledger.id == line.ledger_id))
+                ledger_name = ledger.name if ledger else "Purchase A/c"
+                lines.append(
+                    ProposalLineResponse(
+                        ledger_name=ledger_name,
+                        amount=float(line.amount),
+                        is_debit=line.is_debit,
+                    )
+                )
+        elif p.document_extraction and p.document_extraction.raw_response_json:
+            try:
+                ext_data = ExtractedInvoiceData.model_validate(p.document_extraction.raw_response_json)
+                gen_lines, _, _ = ProposalEngine.generate_proposal(ext_data)
+                lines = [
+                    ProposalLineResponse(
+                        ledger_name=gl.ledger_name,
+                        amount=gl.amount,
+                        is_debit=gl.is_debit,
+                    )
+                    for gl in gen_lines
+                ]
+            except Exception:
+                pass
+
+        # 2. Resolve PostingJob & Verification details
+        posting_job_id = None
+        posting_status = None
+        tally_vch_no = None
+        tally_guid = None
+        act_amount = None
+        exp_amount = None
+        verif_status = None
+        verif_at = None
+
+        if txn:
+            pjob = db.scalar(
+                select(PostingJob)
+                .where(PostingJob.transaction_id == txn.id)
+                .order_by(PostingJob.created_at.desc())
+            )
+            if pjob:
+                posting_job_id = str(pjob.id)
+                posting_status = pjob.status
+                if pjob.attempts:
+                    for att in pjob.attempts:
+                        for resp in att.responses:
+                            if resp.tally_voucher_number:
+                                tally_vch_no = resp.tally_voucher_number
+                            if resp.tally_voucher_guid:
+                                tally_guid = resp.tally_voucher_guid
+                            for vr in resp.verifications:
+                                verif_status = vr.status
+                                if vr.actual_amount is not None:
+                                    act_amount = float(vr.actual_amount)
+                                if vr.expected_amount is not None:
+                                    exp_amount = float(vr.expected_amount)
+                                if vr.verified_at:
+                                    verif_at = vr.verified_at.isoformat()
+                                if vr.actual_tally_voucher_number:
+                                    tally_vch_no = vr.actual_tally_voucher_number
+                                if vr.tally_guid:
+                                    tally_guid = vr.tally_guid
+
         results.append(
             AccountingProposalResponse(
                 id=str(p.id),
@@ -208,8 +291,17 @@ def list_proposals(
                 tax_amount=float(p.tax_amount),
                 narration=p.narration,
                 status=p.status,
-                lines=[],
+                lines=lines,
                 validations=validations,
+                transaction_id=str(txn.id) if txn else None,
+                posting_job_id=posting_job_id,
+                posting_status=posting_status,
+                tally_voucher_number=tally_vch_no,
+                tally_guid=tally_guid,
+                actual_amount=act_amount,
+                expected_amount=exp_amount,
+                verification_status=verif_status,
+                verified_at=verif_at,
             )
         )
     return results

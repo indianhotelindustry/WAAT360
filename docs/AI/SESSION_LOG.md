@@ -4,6 +4,28 @@ This document tracks all significant development and engineering sessions.
 
 ---
 
+## Session 7: Client Demo Command Center & Real-Data Simulator Integrity
+- **Date**: 2026-09-23
+- **Agent**: Antigravity / Gemini 3.8
+- **Objective**: Deliver enterprise SaaS Command Center UI, authoritative backend-derived KPIs, bridge simulator cycle routing to `TallySimulatedAdapter`, and reload persistence across four mandatory controls.
+- **Work Completed**:
+  - **Authoritative Simulator Integrity (`POST /api/v1/bridge/jobs/{id}/simulate-cycle`)**: Wired directly to Bridge's `TallySimulatedAdapter` via dynamic `src.core.bridge_loader`, executing voucher posting, immediate read-back verification against simulated Daybook, `VerificationResult` recording, and immutable `AuditEvent`s. Zero client-side fake voucher generation.
+  - **Database-Derived KPIs (`GET /api/v1/dashboard/summary`)**: Dynamically aggregated real counts for Documents Received, Pending Review, Approved, Posted, Verified, and Exceptions from authoritative PostgreSQL tables.
+  - **Demo vs. Live Transparency**: Strict derivation of 🟡 `DEMO MODE (Simulated Tally)` vs 🟢 `LIVE MODE (TallyPrime Connected)` based on runtime settings and adapter status. Added interactive "Prepare for Live Tally" checklist modal.
+  - **Client-Facing Command Center UI (`web/src/app/page.tsx`)**: Replaced dark workspace with clean enterprise SaaS presentation (Deep Navy `#0F172A` navigation, `#F8FAFC` body, tailored financial tokens). Integrated 6 KPI cards, 10-stage Golden Path visualizer, drag-and-drop & sample invoice ingestion, Gemini extraction card, accounting proposal review, authoritative approval console, Bridge execution trigger, read-back verification card, and audit trail.
+  - **Persistence Across Reload**: Added `GET /api/v1/documents/{id}/extraction` and enriched `GET /api/v1/proposals` with lines, posting, and verification state so full workflow reconstructs cleanly on refresh.
+  - **Environment Configuration**: Supported `NEXT_PUBLIC_API_BASE_URL` with `.env.example` and updated `.gitignore`.
+- **Tests**:
+  - Cloud API: 14/14 passing (`pytest tests/`).
+  - Bridge: 20/20 passing (`pytest tests/`).
+  - Next.js Web: Production build successful (Turbopack, 0 TypeScript errors, 0 ESLint errors).
+  - Python Ruff: 0 lint errors, 100% formatted across both Python packages.
+- **Decisions**: DEC-023 (Client Demo Command Center & Authoritative Simulator Integrity).
+- **Blockers**: None. `LIVE-TALLY-CERT-001` preserved as deployment certification gate for client machine.
+- **Next Action**: Execute deployment package installer (`TASK-DEP-01`) for client office machine certification.
+
+---
+
 ## Session 6: Phase 3 — WAAST360 Lite Golden Path Implementation & Certification
 - **Date**: 2026-09-22
 - **Agent**: Antigravity / Gemini 3.8

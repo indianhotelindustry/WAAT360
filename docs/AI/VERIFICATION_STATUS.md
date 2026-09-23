@@ -9,11 +9,12 @@ This document records the factual verification matrix and ground truth evidence 
 | Subsystem / Area | Category | Status | Evidence / Command Output |
 | :--- | :--- | :---: | :--- |
 | **PostgreSQL Database** | Integration | **PASS** | `alembic current` $\rightarrow$ `390eab233bf5 (head)`, 35 tables active in PostgreSQL 18.4 |
-| **Cloud API Test Suite** | Integration | **PASS** | `pytest tests/` $\rightarrow$ 13 passed in 1.24s (including `test_golden_path_e2e.py`) |
-| **Bridge Test Suite** | Unit/Integration | **PASS** | `pytest tests/` $\rightarrow$ 20 passed in 0.45s (including `test_simulated_adapter.py`) |
-| **Python Code Quality** | Quality Check | **PASS** | `ruff check src/ tests/` $\rightarrow$ All checks passed (API & Bridge) |
+| **Cloud API Test Suite** | Integration | **PASS** | `pytest tests/` $\rightarrow$ 15 passed in 1.39s (including `test_verification_failure_integrity`) |
+| **Bridge Test Suite** | Unit/Integration | **PASS** | `pytest tests/` $\rightarrow$ 20 passed in 0.30s (including `test_simulated_adapter.py`) |
+| **Python Code Quality** | Quality Check | **PASS** | `ruff check src/ tests/` $\rightarrow$ All checks passed (API & Bridge, 0 errors) |
 | **Frontend Lint** | Quality Check | **PASS** | `npm run lint` $\rightarrow$ ESLint 0 errors, 0 warnings |
 | **Frontend Build** | Build Validation | **PASS** | `next build` $\rightarrow$ Compiled successfully in Turbopack, static routes generated |
+| **Dashboard & Simulator** | Integration | **PASS** | Real-data KPI summary & `TallySimulatedAdapter` simulation cycle verified |
 | **Tally Simulated Adapter** | Unit Tested | **PASS** | Full GST ledger state, sequential numbering, idempotent reconciliation verified |
 | **Tally XML Adapter** | Unit Tested | **PASS** | Full envelope generation, parsing, `<SVCURRENTCOMPANY>` verified in tests |
 | **Tally JSON Adapter** | Unit Tested | **PASS** | Native JSON payload and response parsing verified in tests |
@@ -43,25 +44,27 @@ This document records the factual verification matrix and ground truth evidence 
 
 ## 3. Actual Command Verification Logs
 
-### A. Cloud API Pytest Output (13 Tests Passing)
+### A. Cloud API Pytest Output (15 Tests Passing)
 ```powershell
 # Command:
 cd api; .\.venv\Scripts\python -m pytest -v
 # Output:
-tests/test_bridge_router.py::test_bridge_heartbeat_unauthorized PASSED   [  7%]
-tests/test_bridge_router.py::test_bridge_heartbeat_authorized PASSED     [ 15%]
-tests/test_bridge_router.py::test_bridge_report_companies PASSED         [ 23%]
-tests/test_bridge_router.py::test_bridge_poll_pending_jobs PASSED        [ 30%]
-tests/test_bridge_router.py::test_bridge_record_attempt_and_verification PASSED [ 38%]
-tests/test_companies_router.py::test_company_lifecycle_and_tally_mapping PASSED [ 46%]
-tests/test_domain_models.py::test_uuid7_generation PASSED                [ 53%]
-tests/test_domain_models.py::test_tenant_company_tally_hierarchy PASSED  [ 61%]
-tests/test_domain_models.py::test_accounting_proposal_multi_step_approval_and_transaction PASSED [ 69%]
-tests/test_domain_models.py::test_posting_and_verification_evidence_model PASSED [ 76%]
-tests/test_domain_models.py::test_soft_delete_and_audit_event PASSED     [ 84%]
-tests/test_golden_path_e2e.py::test_full_golden_path_lifecycle PASSED    [ 92%]
+tests/test_bridge_router.py::test_bridge_heartbeat_unauthorized PASSED   [  6%]
+tests/test_bridge_router.py::test_bridge_heartbeat_authorized PASSED     [ 13%]
+tests/test_bridge_router.py::test_bridge_report_companies PASSED         [ 20%]
+tests/test_bridge_router.py::test_bridge_poll_pending_jobs PASSED        [ 26%]
+tests/test_bridge_router.py::test_bridge_record_attempt_and_verification PASSED [ 33%]
+tests/test_companies_router.py::test_company_lifecycle_and_tally_mapping PASSED [ 40%]
+tests/test_dashboard_and_simulation.py::test_dashboard_summary_and_simulation_cycle PASSED [ 46%]
+tests/test_dashboard_and_simulation.py::test_verification_failure_integrity PASSED [ 53%]
+tests/test_domain_models.py::test_uuid7_generation PASSED                [ 60%]
+tests/test_domain_models.py::test_tenant_company_tally_hierarchy PASSED  [ 66%]
+tests/test_domain_models.py::test_accounting_proposal_multi_step_approval_and_transaction PASSED [ 73%]
+tests/test_domain_models.py::test_posting_and_verification_evidence_model PASSED [ 80%]
+tests/test_domain_models.py::test_soft_delete_and_audit_event PASSED     [ 86%]
+tests/test_golden_path_e2e.py::test_full_golden_path_lifecycle PASSED    [ 93%]
 tests/test_main.py::test_read_root PASSED                                [100%]
-======================== 13 passed, 1 warning in 1.24s ========================
+======================== 15 passed, 1 warning in 1.39s ========================
 ```
 
 ### B. Bridge Pytest Output (20 Tests Passing)

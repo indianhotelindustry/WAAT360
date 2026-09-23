@@ -1,18 +1,18 @@
 # CURRENT STATE — WAAST360
 
-- **Date**: 2026-09-22
+- **Date**: 2026-09-23
 - **Project**: WAAST360 (Wise Accounting Automation System for Tally)
 - **Current Product**: WAAST360 Lite
 - **Strategic Direction**: Commercial Lite release built strictly on a Prime-grade architectural foundation.
-- **Current Development Phase**: **Golden Path Implementation Complete (Phases 3A through 3L)**.
+- **Current Development Phase**: **Client Demo Command Center & Golden Path Simulator Complete**.
 - **Current Gate**: **`LIVE-TALLY-CERT-001`** (Status: **PENDING** — target is client's office machine).
 
 ---
 
 ## 1. Overall State
-The WAAST360 Lite Golden Path is fully implemented, verified, and certified through automated end-to-end tests:
-1. **Frontend (`web/`)**: Next.js 16 (React 19, TypeScript, Tailwind CSS v4) with an interactive dark-mode dashboard featuring a 10-stage Golden Path pipeline visualizer, invoice upload/sample ingestion, Gemini AI extraction review, double-entry voucher & deterministic validation display, authoritative human approval console, simulated bridge execution trigger, and live append-only audit trail. Production build: passing (Turbopack, 0 TypeScript errors).
-2. **Cloud API (`api/`)**: FastAPI backend with 34 SQLAlchemy domain entities, Alembic migrations (`390eab233bf5`) applied live on local PostgreSQL 18.4, and full suite of routers: `documents`, `proposals`, `approvals`, `bridge`, `companies`. 13/13 pytest tests passing (including complete e2e certification test); 0 ruff errors.
+The WAAST360 Lite Golden Path is fully verified through automated end-to-end tests and fronted by an enterprise-grade Command Center:
+1. **Frontend (`web/`)**: Next.js 16 (React 19, TypeScript, Tailwind CSS v4) enterprise SaaS Command Center (Deep Navy `#0F172A` nav, `#F8FAFC` body). Features 6 real-data KPI cards, 10-stage pipeline visualizer, drag-and-drop & sample invoice ingestion, Gemini extraction review, balanced double-entry proposal card, authoritative human approval console, Bridge execution trigger routing to real `TallySimulatedAdapter`, read-back verification evidence, persistent state across browser reloads, and immutable audit trail. Production build: passing (Turbopack, 0 TypeScript errors, 0 ESLint errors).
+2. **Cloud API (`api/`)**: FastAPI backend with 34 SQLAlchemy domain entities, Alembic migrations (`390eab233bf5`) applied live on local PostgreSQL 18.4, and full suite of routers: `dashboard`, `documents`, `proposals`, `approvals`, `bridge`, `companies`. 15/15 pytest tests passing (including complete e2e certification test and dashboard/simulator tests); 0 ruff errors.
 3. **Bridge Agent (`bridge/`)**: Standalone Python 3.14 client with capability-based Tally adapters (`TallyJsonAdapter`, `TallyXmlAdapter`, `TallySimulatedAdapter`), local SQLite durable queue, posting reconciler with pre/post duplicate prevention, and CLI subcommands (`start`, `test-tally`, `discover`, `status`). 20/20 pytest tests passing; 0 ruff errors.
 
 ---
