@@ -12,6 +12,7 @@ from src.core.database import get_db
 from src.models.entities import (
     AccountingProposal,
     Document,
+    DocumentExtraction,
     Ledger,
     PostingJob,
     Transaction,
@@ -213,9 +214,7 @@ def list_proposals(
 
         # 1. Resolve lines: from TransactionLine if approved, else from DocumentExtraction
         lines: list[ProposalLineResponse] = []
-        txn = db.scalar(
-            select(Transaction).where(Transaction.accounting_proposal_id == p.id)
-        )
+        txn = db.scalar(select(Transaction).where(Transaction.accounting_proposal_id == p.id))
         if txn and txn.lines:
             for line in txn.lines:
                 ledger = db.scalar(select(Ledger).where(Ledger.id == line.ledger_id))
@@ -227,20 +226,24 @@ def list_proposals(
                         is_debit=line.is_debit,
                     )
                 )
-        elif p.document_extraction and p.document_extraction.raw_response_json:
-            try:
-                ext_data = ExtractedInvoiceData.model_validate(p.document_extraction.raw_response_json)
-                gen_lines, _, _ = ProposalEngine.generate_proposal(ext_data)
-                lines = [
-                    ProposalLineResponse(
-                        ledger_name=gl.ledger_name,
-                        amount=gl.amount,
-                        is_debit=gl.is_debit,
+        elif p.document_extraction_id:
+            doc_ext = db.get(DocumentExtraction, p.document_extraction_id)
+            if doc_ext and doc_ext.raw_response_json:
+                try:
+                    ext_data = ExtractedInvoiceData.model_validate(
+                        doc_ext.raw_response_json
                     )
-                    for gl in gen_lines
-                ]
-            except Exception:
-                pass
+                    gen_lines, _, _ = ProposalEngine.generate_proposal(ext_data)
+                    lines = [
+                        ProposalLineResponse(
+                            ledger_name=gl.ledger_name,
+                            amount=gl.amount,
+                            is_debit=gl.is_debit,
+                        )
+                        for gl in gen_lines
+                    ]
+                except Exception:
+                    pass
 
         # 2. Resolve PostingJob & Verification details
         posting_job_id = None

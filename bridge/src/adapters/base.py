@@ -101,6 +101,46 @@ class TallyAdapter(ABC):
     ) -> dict[str, Any]:
         """Update an existing master record in Tally."""
 
+    def get_ledger(self, company_ref: TallyCompanyRef, ledger_name: str) -> LedgerData | None:
+        """Query a single ledger by name for the specified Tally company."""
+        ledgers = self.get_ledgers(company_ref)
+        for ldg in ledgers:
+            if ldg.name.lower() == ledger_name.lower():
+                return ldg
+        return None
+
+    def update_ledger_master(
+        self,
+        company_ref: TallyCompanyRef,
+        ledger_name: str,
+        new_parent_group: str,
+        opening_balance: float | None = None,
+    ) -> dict[str, Any]:
+        """Update an existing ledger master's parent group in Tally."""
+        return self.update_master(
+            company_ref,
+            "Ledger",
+            {"name": ledger_name, "parent_group": new_parent_group, "opening_balance": opening_balance},
+        )
+
+    def verify_ledger_master(
+        self,
+        company_ref: TallyCompanyRef,
+        ledger_name: str,
+        expected_parent_group: str,
+    ) -> dict[str, Any]:
+        """Forensically read back and verify a ledger master's updated configuration in Tally."""
+        ledger = self.get_ledger(company_ref, ledger_name)
+        if not ledger:
+            return {"verified": False, "reason": f"Ledger '{ledger_name}' not found in Tally."}
+        matches = ledger.parent_group.lower() == expected_parent_group.lower()
+        return {
+            "verified": matches,
+            "ledger_name": ledger.name,
+            "actual_parent_group": ledger.parent_group,
+            "expected_parent_group": expected_parent_group,
+        }
+
     @abstractmethod
     def create_voucher(self, command: CreateVoucherCommand) -> VoucherResult:
         """

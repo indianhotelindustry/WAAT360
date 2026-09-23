@@ -6,6 +6,7 @@ from src.routers.bridge import router as bridge_router
 from src.routers.companies import router as companies_router
 from src.routers.dashboard import router as dashboard_router
 from src.routers.documents import router as documents_router
+from src.routers.health_check import router as health_check_router
 from src.routers.proposals import router as proposals_router
 
 app = FastAPI(title="WAAST360 Core API", version="0.1.0")
@@ -25,6 +26,7 @@ app.include_router(dashboard_router)
 app.include_router(documents_router)
 app.include_router(proposals_router)
 app.include_router(approvals_router)
+app.include_router(health_check_router)
 
 
 @app.get("/")

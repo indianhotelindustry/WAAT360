@@ -12,7 +12,7 @@ This backlog defines the exact, prioritized execution sequence for incoming engi
 
 ---
 
-## Completed Tasks (Phases 3A – 3L)
+## Completed Tasks (Phases 3A – 3L, Phase 5, Phase 6)
 
 - [x] **[P0] TASK-GP-01: Document Ingestion & Storage Foundation** (`POST /api/v1/documents/upload`, SHA256 checksum, duplicate detection).
 - [x] **[P0] TASK-GP-02: AI Provider Abstraction & Gemini Implementation** (`AIProvider`, `GeminiProvider`, `POST /api/v1/documents/{id}/extract`).
@@ -22,6 +22,14 @@ This backlog defines the exact, prioritized execution sequence for incoming engi
 - [x] **[P1] TASK-GP-06: Golden Path Frontend UI Console** (Next.js 16 interactive dashboard with 10-stage pipeline, invoice ingestion, approval console, and forensic audit timeline).
 - [x] **[P2] TASK-POL-01: Bridge Simulated Adapter CLI Flag** (`python src/main.py start --simulated`, `--simulated` flag on `test-tally` and `discover`).
 - [x] **[P0] TASK-CMD-01: Enterprise Command Center & Real-Data Simulator** (Enterprise SaaS UI, real database KPI summary endpoint, simulator cycle execution via `TallySimulatedAdapter`, page reload persistence, `.env.example`).
+- [x] **[P0] TASK-CMD-02: V0.0.01 Client Command Center Application Shell & Client Conviction Pass** (Configurable client branding, collapsible enterprise sidebar, top header, 68px global Control Flow sub-header, 6 Command Center tabs, real DB KPIs, Attention Required section, honest standby states, DEMO MODE safety).
+- [x] **[P0] TASK-KNOW-01: Knowledge Core with Provenance** (`KnowledgeItem` FACT/RULE/RECOMMENDATION/DECISION, authoritative source, jurisdiction, effective dates, rule version, status — migration `214dbe10b9e5`).
+- [x] **[P0] TASK-KNOW-02: Decision Memory & Forensic Transparency** (`DecisionMemory` per company+finding_type, `KNOWN_EXCEPTION` surfacing, multi-tenant isolation).
+- [x] **[P0] TASK-HEALTH-01: Accounting Health Check Scanner** (`POST /api/v1/health-check/{company_id}/scan`, provenance-backed findings, "Why This Was Flagged" explanations, FACT/RULE/RECOMMENDATION/DECISION segregation).
+- [x] **[P0] TASK-HEALTH-02: Correction Proposal Lifecycle** (7-step status machine `PROPOSED→ARCHIVED`, stale-proposal protection via 409 CONFLICT, idempotent, auditable, actor-bound).
+- [x] **[P1] TASK-TALLY-01: Extended TallyAdapter Contract** (`getLedger`, `updateLedgerMaster`, `verifyLedgerMaster` in base + `TallySimulatedAdapter`).
+- [x] **[P0] TASK-UI-01: Lite Enterprise Theme** (White/light workspace, dark typography, green/amber/red states, high-density tables, professional accounting ERP appearance).
+- [x] **[P0] TASK-UI-02: Company Intelligence View** (`CompanyIntelligenceView.tsx` — health dashboard, forensic finding cards, correction workflow, decision memory recording, per-company tenant isolation).
 
 ---
 

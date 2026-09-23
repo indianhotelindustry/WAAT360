@@ -4,6 +4,31 @@ This document tracks all significant development and engineering sessions.
 
 ---
 
+## Session 8: WAAST360 V0.0.01 Client Command Center — Application Shell & Client Conviction Pass
+- **Date**: 2026-09-23
+- **Agent**: Antigravity / Gemini 3.8
+- **Objective**: Implement enterprise application shell, persistent collapsible desktop sidebar, top header with configurable branding, 68px global Control Flow sub-header, 6 Command Center tabs, real DB KPIs, and safety controls without committing or pushing.
+- **Work Completed**:
+  - **Configurable Client Branding**: Implemented `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_VERSION`, `NEXT_PUBLIC_APP_EDITION`, and `NEXT_PUBLIC_APP_TAGLINE` (default: "Accounting Automation. Controlled. Verified."). Removed all technical taglines and fixed WAAST360 expansion from primary client-facing views.
+  - **Enterprise Application Shell (`web/src/app/page.tsx`)**: Created collapsible left sidebar with clean enterprise styling across 6 categories: Command Center, Operations, Tally, Intelligence, Control, and System.
+  - **Top Header**: Configured with branding, company selector, FY indicator, Cloud/Bridge/Tally/AI health pills, operator profile, and explicit `DEMO MODE (Simulated Tally)` badge.
+  - **Global Horizontal Control Flow**: Implemented 68px sub-header featuring the 9-stage product control model (`SOURCE → AI → PROPOSE → VALIDATE → APPROVE → BRIDGE → TALLY → VERIFY → AUDIT`) with interactive tooltips.
+  - **Command Center Tabs**: 6 dedicated tabs: `Overview`, `Invoices`, `Tally`, `Banking`, `AI`, and `Audit`.
+  - **Overview Tab**: Client hero, 3 quick actions, real Attention Required queue, 6 real DB-derived KPI cards, Golden Path journey visualizer, system health summary, and recent audit activity.
+  - **Tally Control Center**: Full Tally lifecycle visualizer, discovered companies table with quick mapping, and structural verification intelligence.
+  - **Banking & AI Tabs**: Honest standby states, 3-way matching rules architecture, Gemini 2.0 configuration, and Zero-Unattended-Writes governance guarantee.
+  - **Demo Mode Safety**: Development laptop strictly displays `DEMO MODE (Simulated Tally)` with zero inference of live mode.
+- **Verification**:
+  - Cloud API: 15/15 tests passing (`pytest tests/`).
+  - Bridge: 20/20 tests passing (`pytest tests/`).
+  - Next.js Web: Production build successful (Turbopack, 0 TypeScript errors, 0 ESLint errors).
+  - Python Ruff: 0 lint errors across both `api/` and `bridge/`.
+  - Browser Subagent: Automated walkthrough verified tabs, sidebar, sample invoice ingestion, AI extraction, proposal generation, human approval, Bridge execution, and read-back verification.
+- **Git Status**: Changes preserved in working tree without committing or pushing.
+- **Status**: READY FOR REVIEW.
+
+---
+
 ## Session 7: Client Demo Command Center & Real-Data Simulator Integrity
 - **Date**: 2026-09-23
 - **Agent**: Antigravity / Gemini 3.8
@@ -132,3 +157,38 @@ This document tracks all significant development and engineering sessions.
   - Scaffolding of Next.js 16 frontend (`web/`), FastAPI backend (`api/`), and Python Bridge (`bridge/`).
   - Verified linting and builds.
 - **Decisions**: DEC-001, DEC-002, DEC-004, DEC-005 locked.
+
+---
+
+## Session 9: Phase 6 — Knowledge Core + Accounting Health Check + Lite Theme + Company Intelligence
+- **Date**: 2026-09-23
+- **Agent**: Antigravity / Gemini 3.8
+- **Objective**: Implement Knowledge Core with provenance, forensic Accounting Health Check scanner, correction lifecycle with stale-proposal protection, Lite enterprise theme, and Company Intelligence frontend view.
+- **Work Completed**:
+  - **Knowledge Core (`api/src/models/knowledge_entities.py`)**: `KnowledgeItem` model with FACT/RULE/RECOMMENDATION/DECISION `item_type`, `authoritative_source`, `jurisdiction`, `effective_from`, `effective_until`, `rule_version`, `status`. Enforces: no tax/legal rule without provenance.
+  - **Decision Memory (`api/src/models/knowledge_entities.py`)**: `DecisionMemory` model per `(company_id, finding_type)`. Persists human exceptions with `recorded_by`, `decision_type`, `reasoning`. Surfaces `KNOWN_EXCEPTION` status (never silent suppression).
+  - **Knowledge Core Migration (`214dbe10b9e5`)**: Alembic migration adding `knowledge_items` and `decision_memories` tables.
+  - **Accounting Health Check Router (`api/src/routers/health_check.py`)**: Full `/api/v1/health-check/` router with: `scan` (deterministic findings, provenance-backed), `knowledge` (item CRUD), `corrections` (lifecycle CRUD), `exceptions` (decision memory recording). Every finding carries `explanation`, `authoritative_source`, `jurisdiction`, `effective_from`.
+  - **Correction Lifecycle**: 7-step status machine `PROPOSED → APPROVED → EXECUTION_ELIGIBLE → EXECUTING → EXECUTED → VERIFIED → ARCHIVED`. Idempotent, auditable, actor-bound.
+  - **Stale Proposal Protection**: `execute_correction_and_verify` reads current Tally ledger state at execution time and raises `409 CONFLICT` if Tally state has drifted from proposal snapshot.
+  - **Extended TallyAdapter Contract (`bridge/src/adapters/base.py`)**: Added `getLedger()`, `updateLedgerMaster()`, `verifyLedgerMaster()` as abstract methods.
+  - **TallySimulatedAdapter**: Implemented all three new contract methods with deterministic in-memory ledger state.
+  - **Lite Enterprise Theme (`web/src/app/CompanyIntelligenceView.tsx`)**: White/light workspace, dark typography, green/amber/red operational states, high-density accounting tables, subtle borders and shadows.
+  - **Company Intelligence View**: Health dashboard, forensic finding cards with expandable "Why This Was Flagged" explanation panels, correction approval/execution workflow, decision memory recording UI, per-company tenant isolation.
+  - **Integration into Shell (`web/src/app/page.tsx`)**: `CompanyIntelligenceView` mounted in the Intelligence section; company selector drives per-company scoping.
+  - **Test Suite (`api/tests/test_knowledge_and_health_check.py`)**: 5 new tests covering provenance enforcement, multi-tenant decision isolation, health check scan findings, forensic transparency (KNOWN_EXCEPTION surfacing), and full correction lifecycle including stale-proposal protection.
+- **Verification**:
+  - Cloud API: **20/20 tests passing** (`pytest tests/`).
+  - Bridge: **21/21 tests passing** (`pytest tests/`).
+  - Next.js Web: Production build successful (Turbopack, 0 TypeScript errors, 0 ESLint errors).
+  - Python Ruff: 0 lint errors across both `api/` and `bridge/`.
+- **Mandatory Amendments Honoured**:
+  1. No hard-coded tax/legal rules — every KnowledgeItem requires `authoritative_source`, `effective_from`, `jurisdiction`.
+  2. FACT/RULE/RECOMMENDATION/DECISION strictly segregated in `item_type`.
+  3. Decision Memory produces `KNOWN_EXCEPTION` status, not silent suppression.
+  4. Correction execution: strong status-based controls, stale-proposal 409, idempotency.
+  5. TallyAdapter contract extended (`getLedger`, `updateLedgerMaster`, `verifyLedgerMaster`).
+  6. Company Intelligence anchors to company context — no shadow copy of Tally master.
+  7. Company/tenant isolation enforced in all scanner and memory endpoints.
+- **Git Status**: All changes preserved in working tree. Not committed or pushed.
+- **Status**: COMPLETE — awaiting commit instruction.

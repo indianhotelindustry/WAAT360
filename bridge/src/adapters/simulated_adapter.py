@@ -35,6 +35,13 @@ class TallySimulatedAdapter(TallyAdapter):
         # Realistic Companies
         self._companies = [
             DiscoveredCompany(
+                name="Synthetic Demonstration Company",
+                guid="SIM-DEMO-001",
+                financial_year_from="2024-2025",
+                books_from="2024-04-01",
+                is_active=True,
+            ),
+            DiscoveredCompany(
                 name="Tata Motors Technologies Ltd",
                 guid="TALLY-SIM-001",
                 financial_year_from="2024-2025",
@@ -57,7 +64,7 @@ class TallySimulatedAdapter(TallyAdapter):
             ),
         ]
 
-        # Realistic Indian GST Ledgers
+        # Realistic Indian GST Ledgers (with Deterministic Synthetic Anomalies for SIM-DEMO-001)
         self._ledgers = [
             LedgerData(name="Purchase A/c", parent_group="Purchase Accounts", opening_balance=0.0),
             LedgerData(name="Sales A/c", parent_group="Sales Accounts", opening_balance=0.0),
@@ -91,10 +98,47 @@ class TallySimulatedAdapter(TallyAdapter):
                 parent_group="Sundry Debtors",
                 opening_balance=95000.0,
             ),
+            # Seeded Anomaly 1: Trade vendor misclassified under Indirect Expenses (FOR-LED-001)
+            LedgerData(
+                name="ABC Traders",
+                parent_group="Indirect Expenses",
+                opening_balance=-25000.0,
+            ),
+            # Seeded Anomaly 2: Duplicate / Near-duplicate master cluster (FOR-DUP-001)
+            LedgerData(
+                name="Freight Charges",
+                parent_group="Direct Expenses",
+                opening_balance=12000.0,
+            ),
+            LedgerData(
+                name="Freight & Cartage Expenses",
+                parent_group="Direct Expenses",
+                opening_balance=8500.0,
+            ),
+            # Seeded Anomaly 3: Non-standard GST rate without matching SGST ledger (FOR-GST-001)
+            LedgerData(
+                name="Input CGST 14%",
+                parent_group="Duties & Taxes",
+                opening_balance=0.0,
+            ),
+            # Seeded Anomaly 4: Professional service ledger requiring TDS 194J review (FOR-TDS-001)
+            LedgerData(
+                name="Legal & Professional Fees",
+                parent_group="Indirect Expenses",
+                opening_balance=75000.0,
+            ),
         ]
 
         # Parties (Sundry Creditors / Debtors)
         self._parties = [
+            PartyData(
+                name="ABC Traders",
+                party_type="CREDITOR",
+                parent_group="Indirect Expenses",
+                gstin="27ABCDE1234F1Z5",
+                state="Maharashtra",
+                opening_balance=-25000.0,
+            ),
             PartyData(
                 name="Shreeji Steel Traders",
                 party_type="CREDITOR",
@@ -239,7 +283,35 @@ class TallySimulatedAdapter(TallyAdapter):
     def update_master(
         self, company_ref: TallyCompanyRef, master_type: str, data: dict[str, Any]
     ) -> dict[str, Any]:
-        return {"status": "updated", "master_type": master_type, "name": data.get("name")}
+        name = data.get("name")
+        new_parent = data.get("parent_group")
+        updated = False
+        if master_type.upper() == "LEDGER" and name:
+            for i, ldg in enumerate(self._ledgers):
+                if ldg.name.lower() == name.lower():
+                    op_bal = data.get("opening_balance")
+                    self._ledgers[i] = LedgerData(
+                        name=ldg.name,
+                        parent_group=new_parent if new_parent else ldg.parent_group,
+                        opening_balance=op_bal if op_bal is not None else ldg.opening_balance,
+                        tally_guid=ldg.tally_guid,
+                        tally_master_id=ldg.tally_master_id,
+                        is_active=ldg.is_active,
+                    )
+                    updated = True
+                    break
+            if not updated and new_parent:
+                self._ledgers.append(
+                    LedgerData(name=name, parent_group=new_parent, opening_balance=data.get("opening_balance", 0.0))
+                )
+                updated = True
+        return {
+            "status": "updated",
+            "master_type": master_type,
+            "name": name,
+            "updated": updated,
+            "new_parent_group": new_parent,
+        }
 
     def create_voucher(self, command: CreateVoucherCommand) -> VoucherResult:
         comp_name = command.company_ref.company_name

@@ -1,36 +1,45 @@
 # ACTIVE WORK — WAAST360
 
 ## 1. Current Workstream
-**Phase 4: Client Demo Command Center & Authoritative Golden Path Simulator (Completed)**
+**Phase 6: Knowledge Core + Accounting Health Check + Lite Theme + Company Intelligence View (Completed)**
 
-## 2. Current Objective
-Delivered an enterprise-grade client-facing Command Center UI and authoritative backend simulator with 4 mandatory controls:
-- [x] `Control 1: Real Golden Path Simulator`: `PostingJob` $\rightarrow$ Bridge abstraction $\rightarrow$ `TallySimulatedAdapter` $\rightarrow$ Simulated Tally state $\rightarrow$ Read-back $\rightarrow$ `VerificationResult` $\rightarrow$ `AuditEvent`. Zero random voucher strings, zero hardcoded ₹17,700 amounts, zero client-mocked Tally responses.
-- [x] `Control 2: Database-Derived KPIs`: `GET /api/v1/dashboard/summary` querying authoritative PostgreSQL entities (`Document`, `AccountingProposal`, `PostingJob`, `VerificationResult`, `DomainException`).
-- [x] `Control 3: Demo vs Live Transparency`: 🟡 `DEMO MODE (Simulated Tally)` vs 🟢 `LIVE MODE (TallyPrime Connected)` derived from runtime configuration and adapter state.
-- [x] `Control 4: Focused Client Journey`: Dedicated 10-stage Golden Path progression (Upload $\rightarrow$ Extract $\rightarrow$ Proposal $\rightarrow$ Validate $\rightarrow$ Approve $\rightarrow$ Bridge $\rightarrow$ Tally $\rightarrow$ Verify $\rightarrow$ Audit).
-- [x] `Control 5: Environment Configuration`: Support `NEXT_PUBLIC_API_BASE_URL` with `.env.example` contract.
-- [x] `Control 6: Page Reload Persistence`: REST query endpoints (`GET /documents/{id}/extraction`, enhanced `GET /proposals`) ensure complete workflow state reconstructs upon browser reload.
+## 2. Phase 6 Objective & Delivery
+Delivered the Knowledge Core, forensic Accounting Health Check, correction lifecycle, and Company Intelligence frontend:
+
+- [x] **Knowledge Core with Provenance**: `KnowledgeItem` (FACT/RULE/RECOMMENDATION/DECISION) with `source`, `jurisdiction`, `effective_from`, `effective_until`, `rule_version`, `status`. No tax/legal rule stored without authoritative provenance.
+- [x] **Decision Memory**: `DecisionMemory` persists human exception decisions per `(company_id, finding_type)`. Surfaces `KNOWN_EXCEPTION` status — never silently suppresses findings.
+- [x] **Accounting Health Check Scanner**: `POST /api/v1/health-check/{company_id}/scan` returns deterministic, provenance-backed findings with FACT/RULE/RECOMMENDATION/DECISION classification.
+- [x] **"Why This Was Flagged" Explanations**: Every finding carries `explanation`, `authoritative_source`, `jurisdiction`, `effective_from`. Zero unexplained machine decisions.
+- [x] **Correction Proposal Lifecycle**: 7-step status-machine flow `PROPOSED → APPROVED → EXECUTION_ELIGIBLE → EXECUTING → EXECUTED → VERIFIED → ARCHIVED`. Idempotent, auditable, actor-bound.
+- [x] **Stale Proposal Protection**: Executor checks Tally master snapshot at proposal creation vs. current state before executing; raises `409 CONFLICT` on drift.
+- [x] **Extended TallyAdapter Contract**: `getLedger()`, `updateLedgerMaster()`, `verifyLedgerMaster()` added to base contract and `TallySimulatedAdapter`.
+- [x] **Lite Enterprise Theme**: White/light workspace, dark typography, green/amber/red states, high-density tables — professional accounting ERP appearance (not a developer console).
+- [x] **Company Intelligence View (`CompanyIntelligenceView.tsx`)**: Health dashboard, forensic finding cards with expandable explanation panels, correction approval/execution workflow, decision memory recording, per-company tenant isolation.
+- [x] **Knowledge Core Migration (`214dbe10b9e5`)**: `knowledge_items` and `decision_memories` tables added via Alembic.
 
 ## 3. Files Created / Modified
+
 ### Cloud API (`api/`)
-- `src/core/bridge_loader.py`: Safe dynamic loader for Bridge modules without namespace collision.
-- `src/routers/dashboard.py`: Real-data KPI endpoint (`GET /api/v1/dashboard/summary`).
-- `src/routers/bridge.py`: Added `POST /api/v1/bridge/jobs/{id}/simulate-cycle` running `TallySimulatedAdapter`.
-- `src/routers/companies.py`: Included `financial_year` in company response.
-- `src/routers/documents.py`: Added `GET /api/v1/documents/{id}/extraction`.
-- `src/routers/proposals.py`: Enhanced `AccountingProposalResponse` with lines, posting, verification state.
-- `src/main.py`: Mounted dashboard router.
-- `tests/test_dashboard_and_simulation.py`: Unit & integration tests for summary KPIs and simulation cycle.
+- `src/models/knowledge_entities.py`: `KnowledgeItem`, `DecisionMemory` SQLAlchemy models.
+- `src/routers/health_check.py`: Full `/api/v1/health-check/` router (scan, knowledge, corrections, exceptions).
+- `src/forensics/` (new directory): Forensic analysis engine utilities.
+- `src/main.py`: Registered `health_check` router.
+- `alembic/versions/214dbe10b9e5_add_knowledge_core_and_health_check.py`: Knowledge Core migration.
+- `tests/test_knowledge_and_health_check.py`: 5 new tests (provenance, multi-tenant isolation, scan findings, forensic transparency, correction lifecycle + stale protection).
+
+### Bridge (`bridge/`)
+- `src/adapters/base.py`: Extended `TallyAdapter` abstract contract.
+- `src/adapters/simulated_adapter.py`: Implemented `getLedger`, `updateLedgerMaster`, `verifyLedgerMaster`.
+- `tests/test_simulated_adapter.py`: Added ledger master update/read-back test.
 
 ### Web Console (`web/`)
-- `src/app/page.tsx`: Enterprise Command Center UI (Deep Navy `#0F172A`, `#F8FAFC`, 6 KPIs, Golden Path visualizer, drag-and-drop ingestion, Gemini extraction card, proposal review, approval, Bridge simulator trigger, read-back verification card, audit log).
-- `src/app/layout.tsx`: Updated meta title and typing.
-- `src/app/globals.css`: Tailwind v4 light tokens.
-- `.env.example`: Documents `NEXT_PUBLIC_API_BASE_URL`.
-- `.gitignore`: Allows committing `.env.example`.
+- `src/app/CompanyIntelligenceView.tsx`: New Company Intelligence view (Lite theme).
+- `src/app/page.tsx`: Integrated `CompanyIntelligenceView` into the Intelligence section.
 
 ## 4. Verification Completed
-- `api/`: 15/15 tests passing, 0 ruff errors.
-- `bridge/`: 20/20 tests passing, 0 ruff errors.
+- `api/`: **20/20** tests passing, 0 ruff errors.
+- `bridge/`: **21/21** tests passing, 0 ruff errors.
 - `web/`: Next.js 16 build passing (Turbopack, 0 TypeScript errors, 0 ESLint errors).
+
+## 5. Next Workstream
+**[P0] TASK-DEP-01: Client Deployment & Office Machine Installer** — see NEXT_ACTIONS.md.

@@ -610,11 +610,7 @@ def simulate_bridge_posting_cycle(
             if latest_vr and latest_vr.actual_tally_voucher_number
             else "PUR/2026/0001"
         )
-        actual_guid = (
-            latest_vr.tally_guid
-            if latest_vr and latest_vr.tally_guid
-            else "N/A"
-        )
+        actual_guid = latest_vr.tally_guid if latest_vr and latest_vr.tally_guid else "N/A"
         actual_amt = (
             float(latest_vr.actual_amount)
             if latest_vr and latest_vr.actual_amount is not None
@@ -657,7 +653,9 @@ def simulate_bridge_posting_cycle(
         )
 
     company = db.scalar(select(Company).where(Company.id == txn.company_id))
-    company_name = company.trade_name or company.legal_name if company else "Tata Motors Technologies Ltd"
+    company_name = (
+        company.trade_name or company.legal_name if company else "Tata Motors Technologies Ltd"
+    )
 
     # 1. Build domain lines from authoritative transaction lines
     domain_lines = []

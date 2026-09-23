@@ -55,3 +55,10 @@ def get_simulated_adapter() -> Any:
 
     _simulated_adapter_instance = TallySimulatedAdapter()
     return _simulated_adapter_instance
+
+
+def get_simulated_adapter_class() -> Any:
+    get_simulated_adapter()
+    from src.adapters.simulated_adapter import TallySimulatedAdapter
+
+    return TallySimulatedAdapter

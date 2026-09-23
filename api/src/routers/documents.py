@@ -268,7 +268,9 @@ def get_document_extraction(
         extraction_id=str(extraction.id),
         ai_provider=extraction.ai_provider,
         model_name=extraction.model_name,
-        confidence_score=float(extraction.confidence_score) if extraction.confidence_score else None,
+        confidence_score=float(extraction.confidence_score)
+        if extraction.confidence_score
+        else None,
         status=doc.status,
         extracted_data=extracted,
     )

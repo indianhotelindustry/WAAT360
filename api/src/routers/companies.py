@@ -73,7 +73,9 @@ def list_companies(db: Session = Depends(get_db)):
                     gstin=c.gstin,
                     mapped_tally_company_id=str(mapped_tc.id) if mapped_tc else None,
                     mapped_tally_company_name=mapped_tc.company_name if mapped_tc else None,
-                    financial_year=mapped_tc.financial_year if mapped_tc and mapped_tc.financial_year else "2024-2025",
+                    financial_year=mapped_tc.financial_year
+                    if mapped_tc and mapped_tc.financial_year
+                    else "2024-2025",
                 )
             )
         return results

@@ -868,3 +868,64 @@ class AuditEvent(Base):
     )
 
     __table_args__ = (Index("ix_audit_org_action", "organization_id", "action", "recorded_at"),)
+
+
+# ==========================================
+# 11. KNOWLEDGE CORE & HEALTH CHECK CLUSTER
+# ==========================================
+from src.models.knowledge_entities import (  # noqa: E402
+    CompanyKnowledgeProfile,
+    CorrectionJob,
+    CorrectionProposal,
+    DecisionMemory,
+    ForensicFinding,
+    ForensicScan,
+    KnowledgeItem,
+    KnowledgeSource,
+)
+
+__all__ = [
+    "Organization",
+    "Company",
+    "Branch",
+    "User",
+    "Role",
+    "Permission",
+    "UserRole",
+    "RolePermission",
+    "TallyInstance",
+    "TallyCompany",
+    "Bridge",
+    "Connection",
+    "SyncJob",
+    "SyncRun",
+    "Party",
+    "PartyIdentity",
+    "Ledger",
+    "Item",
+    "Tax",
+    "Document",
+    "DocumentVersion",
+    "DocumentExtraction",
+    "ExtractionField",
+    "AccountingProposal",
+    "ValidationResult",
+    "Approval",
+    "Transaction",
+    "TransactionLine",
+    "PostingJob",
+    "PostingAttempt",
+    "PostingResponse",
+    "VerificationResult",
+    "DomainException",
+    "AuditEvent",
+    # Knowledge Core & Forensic Health Check
+    "KnowledgeSource",
+    "KnowledgeItem",
+    "CompanyKnowledgeProfile",
+    "DecisionMemory",
+    "ForensicScan",
+    "ForensicFinding",
+    "CorrectionProposal",
+    "CorrectionJob",
+]

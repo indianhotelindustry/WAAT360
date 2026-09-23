@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WAAST360 Command Center",
-  description: "Wise Accounting Automation System for Tally",
+  title: "WAAST360 V0.0.01 — Client Command Center",
+  description: "Accounting Automation. Controlled. Verified.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

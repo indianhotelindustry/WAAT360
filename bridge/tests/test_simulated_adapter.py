@@ -18,8 +18,9 @@ def test_simulated_adapter_status_and_discovery():
     assert "Simulated" in status.tally_version
 
     companies = adapter.get_companies()
-    assert len(companies) == 3
+    assert len(companies) >= 3
     names = [c.name for c in companies]
+    assert "Synthetic Demonstration Company" in names
     assert "Tata Motors Technologies Ltd" in names
     assert "Acme Industrial Technologies Pvt Ltd" in names
 
@@ -103,3 +104,27 @@ def test_simulated_adapter_idempotency_duplicate_prevention():
 
     assert res1.voucher_number == res2.voucher_number
     assert res1.voucher_guid == res2.voucher_guid
+
+
+def test_simulated_adapter_ledger_master_update_and_read_back():
+    adapter = TallySimulatedAdapter()
+    company_ref = TallyCompanyRef(company_name="Synthetic Demonstration Company")
+
+    # 1. Verify before state: ABC Traders is under Indirect Expenses
+    before = adapter.get_ledger(company_ref, "ABC Traders")
+    assert before is not None
+    assert before.parent_group == "Indirect Expenses"
+
+    # 2. Execute update
+    res = adapter.update_ledger_master(company_ref, "ABC Traders", "Sundry Creditors")
+    assert res["status"] == "updated"
+    assert res["updated"] is True
+
+    # 3. Read back and verify after state
+    evidence = adapter.verify_ledger_master(company_ref, "ABC Traders", "Sundry Creditors")
+    assert evidence["verified"] is True
+    assert evidence["actual_parent_group"] == "Sundry Creditors"
+
+    after = adapter.get_ledger(company_ref, "ABC Traders")
+    assert after is not None
+    assert after.parent_group == "Sundry Creditors"

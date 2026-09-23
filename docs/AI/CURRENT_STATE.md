@@ -4,16 +4,26 @@
 - **Project**: WAAST360 (Wise Accounting Automation System for Tally)
 - **Current Product**: WAAST360 Lite
 - **Strategic Direction**: Commercial Lite release built strictly on a Prime-grade architectural foundation.
-- **Current Development Phase**: **Client Demo Command Center & Golden Path Simulator Complete**.
+- **Current Development Phase**: **Phase 6: Knowledge Core + Accounting Health Check + Company Intelligence View (Complete)**.
 - **Current Gate**: **`LIVE-TALLY-CERT-001`** (Status: **PENDING** — target is client's office machine).
 
 ---
 
 ## 1. Overall State
-The WAAST360 Lite Golden Path is fully verified through automated end-to-end tests and fronted by an enterprise-grade Command Center:
-1. **Frontend (`web/`)**: Next.js 16 (React 19, TypeScript, Tailwind CSS v4) enterprise SaaS Command Center (Deep Navy `#0F172A` nav, `#F8FAFC` body). Features 6 real-data KPI cards, 10-stage pipeline visualizer, drag-and-drop & sample invoice ingestion, Gemini extraction review, balanced double-entry proposal card, authoritative human approval console, Bridge execution trigger routing to real `TallySimulatedAdapter`, read-back verification evidence, persistent state across browser reloads, and immutable audit trail. Production build: passing (Turbopack, 0 TypeScript errors, 0 ESLint errors).
-2. **Cloud API (`api/`)**: FastAPI backend with 34 SQLAlchemy domain entities, Alembic migrations (`390eab233bf5`) applied live on local PostgreSQL 18.4, and full suite of routers: `dashboard`, `documents`, `proposals`, `approvals`, `bridge`, `companies`. 15/15 pytest tests passing (including complete e2e certification test and dashboard/simulator tests); 0 ruff errors.
-3. **Bridge Agent (`bridge/`)**: Standalone Python 3.14 client with capability-based Tally adapters (`TallyJsonAdapter`, `TallyXmlAdapter`, `TallySimulatedAdapter`), local SQLite durable queue, posting reconciler with pre/post duplicate prevention, and CLI subcommands (`start`, `test-tally`, `discover`, `status`). 20/20 pytest tests passing; 0 ruff errors.
+The WAAST360 Lite Golden Path is fully verified through automated end-to-end tests and fronted by the V0.0.01 Client Command Center:
+1. **Frontend (`web/`)**: Next.js 16 (React 19, TypeScript, Tailwind CSS v4) enterprise SaaS application shell. Features:
+   - Configurable client branding via `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_VERSION`, `NEXT_PUBLIC_APP_EDITION`, `NEXT_PUBLIC_APP_TAGLINE`.
+   - Collapsible desktop left sidebar with Command Center, Operations, Tally, Intelligence, Control, and System groups.
+   - Streamlined top header with company & FY context, independent health pills (Cloud, Bridge, Tally Sim, AI), and explicit `DEMO MODE (Simulated Tally)` safety badge.
+   - Global 9-stage horizontal Control Flow sub-header (`SOURCE → AI → PROPOSE → VALIDATE → APPROVE → BRIDGE → TALLY → VERIFY → AUDIT`) with interactive tooltips.
+   - 6 Command Center tabs: `Overview`, `Invoices`, `Tally`, `Banking`, `AI`, and `Audit`.
+   - Overview hero with client tagline, 3 quick actions, Attention Required queue, real DB-derived KPI cards, system health summary, and recent audit activity.
+   - Invoices workspace with 10-stage Golden Path visualizer, AI extraction preview, invariant validations, double-entry proposal, human approval console, Bridge execution trigger, and read-back verification evidence.
+   - Tally Control Center with lifecycle tracking, discovered companies table, and multi-company binding.
+   - Banking & AI tabs with honest standby states and zero-unattended-writes governance guarantees.
+   - Production build: passing (Turbopack, 0 TypeScript errors, 0 ESLint errors).
+2. **Cloud API (`api/`)**: FastAPI backend with 34 SQLAlchemy domain entities + Knowledge Core entities, Alembic migrations (`390eab233bf5` base + `214dbe10b9e5` Knowledge Core) applied live on local PostgreSQL 18.4, and full suite of routers: `dashboard`, `documents`, `proposals`, `approvals`, `bridge`, `companies`, `health_check`. **20/20 pytest tests passing** (including complete e2e certification test, dashboard/simulator tests, and 5 Knowledge Core + Health Check tests); 0 ruff errors.
+3. **Bridge Agent (`bridge/`)**: Standalone Python 3.14 client with capability-based Tally adapters (`TallyJsonAdapter`, `TallyXmlAdapter`, `TallySimulatedAdapter`), local SQLite durable queue, posting reconciler with pre/post duplicate prevention, extended adapter contract (`getLedger`, `updateLedgerMaster`, `verifyLedgerMaster`), and CLI subcommands (`start`, `test-tally`, `discover`, `status`). **21/21 pytest tests passing**; 0 ruff errors.
 
 ---
 
@@ -78,9 +88,23 @@ The WAAST360 Lite Golden Path is fully verified through automated end-to-end tes
 
 ### Phase 3L: End-to-End Automated Certification
 - [x] Automated test `tests/test_golden_path_e2e.py` executes full 10-stage lifecycle from invoice upload to read-back verification.
-- [x] 13/13 API tests passing.
-- [x] 20/20 Bridge tests passing.
+- [x] 20/20 API tests passing.
+- [x] 21/21 Bridge tests passing.
 - [x] Next.js frontend production build passing with 0 errors.
+
+### Phase 6: Knowledge Core + Accounting Health Check + Lite Theme + Company Intelligence
+- [x] **Knowledge Core with Provenance**: `KnowledgeItem` model with `source`, `jurisdiction`, `effective_from`, `effective_until`, `rule_version`, `status`, `item_type` (FACT/RULE/RECOMMENDATION/DECISION).
+- [x] **Decision Memory**: `DecisionMemory` model persists human exception decisions per company+finding_type pair; surfaces `KNOWN_EXCEPTION` status instead of silently suppressing findings.
+- [x] **Accounting Health Check Scanner**: `POST /api/v1/health-check/{company_id}/scan` returns deterministic findings against the company's Tally simulated state with `FACT`, `RULE`, `RECOMMENDATION`, and `DECISION` segregation.
+- [x] **"Why This Was Flagged" Explanation**: Each finding carries `explanation`, `authoritative_source`, `jurisdiction`, `effective_from` — no unexplained findings.
+- [x] **Correction Proposal Lifecycle**: 7-step status-based flow `PROPOSED → APPROVED → EXECUTION_ELIGIBLE → EXECUTING → EXECUTED → VERIFIED → ARCHIVED`.
+- [x] **Stale Proposal Protection**: `execute_correction_and_verify` checks Tally master state against proposal snapshot before executing; raises `409 CONFLICT` if Tally state has drifted.
+- [x] **Extended TallyAdapter Contract**: `getLedger()`, `updateLedgerMaster()`, `verifyLedgerMaster()` added to `TallyAdapter` base and implemented in `TallySimulatedAdapter`.
+- [x] **Lite Enterprise Theme**: White/light workspace, dark readable typography, green/amber/red operational states, high-density tables, subtle borders and shadows — professional accounting ERP appearance.
+- [x] **Company Intelligence View (`CompanyIntelligenceView.tsx`)**: Health dashboard, forensic finding cards with explanation panels, correction approval/execution workflow, decision memory recording, per-company isolation.
+- [x] **Knowledge Core Migration (`214dbe10b9e5`)**: New Alembic migration for `knowledge_items` and `decision_memories` tables.
+- [x] **Multi-Tenant Isolation Tests**: `test_decision_memory_multi_tenant_isolation` verifies company-scoped decision isolation.
+- [x] **Forensic Transparency Test**: `test_decision_memory_preserves_forensic_transparency` verifies `KNOWN_EXCEPTION` surfacing.
 
 ---
 
@@ -106,3 +130,5 @@ The WAAST360 Lite Golden Path is fully verified through automated end-to-end tes
 
 ## 5. Next Immediate Action
 - Prepare the deployment package for the client office machine to execute `LIVE-TALLY-CERT-001` against real TallyPrime.
+- Run `git add api/ web/ docs/AI/` and commit when instructed.
+- Future: Seed realistic simulator data (synthetic demo company with deterministic anomalies beyond the existing simulated adapter state).

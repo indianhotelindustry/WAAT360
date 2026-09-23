@@ -60,14 +60,16 @@ def get_dashboard_summary(
     if company_id:
         try:
             comp_uuid = uuid.UUID(company_id)
-            comp = db.scalar(select(Company).where(Company.id == comp_uuid, Company.is_deleted == False))  # noqa: E712
+            comp = db.scalar(
+                select(Company).where(Company.id == comp_uuid, Company.is_deleted.is_(False))
+            )
             if comp:
                 company_name = comp.legal_name
         except Exception:
             comp_uuid = None
 
     # 1. Documents Received (Real Count)
-    doc_query = select(func.count(Document.id)).where(Document.is_deleted == False)  # noqa: E712
+    doc_query = select(func.count(Document.id)).where(Document.is_deleted.is_(False))
     if comp_uuid:
         doc_query = doc_query.where(Document.company_id == comp_uuid)
     documents_received = db.scalar(doc_query) or 0
@@ -117,7 +119,8 @@ def get_dashboard_summary(
 
     # 6. Exceptions (Real Count: duplicate flagged documents, failed validations, domain exceptions)
     dup_doc_query = select(func.count(Document.id)).where(
-        Document.status == "DUPLICATE_FLAGGED", Document.is_deleted == False  # noqa: E712
+        Document.status == "DUPLICATE_FLAGGED",
+        Document.is_deleted == False,  # noqa: E712
     )
     failed_prop_query = select(func.count(AccountingProposal.id)).where(
         AccountingProposal.status == "VALIDATION_FAILED",
@@ -141,13 +144,13 @@ def get_dashboard_summary(
     bridge_db = db.scalar(select(Bridge).order_by(Bridge.last_heartbeat_at.desc()))
 
     bridge_connected = bool(latest_client or (bridge_db and bridge_db.last_heartbeat_at))
-    client_id_display = (
-        latest_client
-        or (bridge_db.bridge_client_id if bridge_db else "waast-bridge-local")
+    client_id_display = latest_client or (
+        bridge_db.bridge_client_id if bridge_db else "waast-bridge-local"
     )
-    last_hb = (
-        bridge_state.get("last_heartbeat")
-        or (bridge_db.last_heartbeat_at.isoformat() if bridge_db and bridge_db.last_heartbeat_at else None)
+    last_hb = bridge_state.get("last_heartbeat") or (
+        bridge_db.last_heartbeat_at.isoformat()
+        if bridge_db and bridge_db.last_heartbeat_at
+        else None
     )
 
     tally_details = bridge_state.get("tally_status", {})
@@ -157,6 +160,7 @@ def get_dashboard_summary(
     # Live vs Demo Mode determination (Control 3):
     # Only LIVE MODE if explicitly configured via WAAST_LIVE_MODE AND confirmed non-simulated runtime
     import os
+
     explicit_live = os.environ.get("WAAST_LIVE_MODE", "false").lower() in ("true", "1")
     is_live = (
         explicit_live
